@@ -6,6 +6,7 @@ authors:
     orcid: "https://orcid.org/0009-0000-6869-3489"
 title: "SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline"
 version: 1.0.0
+doi: "10.5281/zenodo.21410548"
 date-released: 2026-07-17
 url: "https://github.com/Joax1213/SCRIPTMETODOLOGICO"
 repository-code: "https://github.com/Joax1213/SCRIPTMETODOLOGICO"
