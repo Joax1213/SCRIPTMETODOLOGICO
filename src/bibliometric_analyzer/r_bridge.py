@@ -742,6 +742,7 @@ tryCatch({{
         r_sources_path = os.path.join(temp_dir, "r_sources.csv")
         r_authors_path = os.path.join(temp_dir, "r_authors.csv")
         
+        temp_dir_esc_fb = temp_dir.replace('\\', '\\\\')
         r_code_fallback = f"""
         library(bibliometrix)
         M <- convert2df(file = "{input_esc}", dbsource = "{dbsource}", format = "{format_type}")
@@ -751,10 +752,10 @@ tryCatch({{
         if (ncol(df_sources) >= 2) {{ names(df_sources) <- c("Source", "Frequency") }} else {{ df_sources <- data.frame(Source = character(), Frequency = numeric()) }}
         df_authors <- as.data.frame(results$Authors)
         if (ncol(df_authors) >= 2) {{ names(df_authors) <- c("Author", "Frequency") }} else {{ df_authors <- data.frame(Author = character(), Frequency = numeric()) }}
-        write.csv(df_years, file = file.path("{temp_dir.replace('\\', '\\\\')}", "r_years.csv"), row.names=FALSE)
-        write.csv(df_sources, file = file.path("{temp_dir.replace('\\', '\\\\')}", "r_sources.csv"), row.names=FALSE)
-        write.csv(df_authors, file = file.path("{temp_dir.replace('\\', '\\\\')}", "r_authors.csv"), row.names=FALSE)
-        write.csv(M[, c("UT", "TI", "AU", "PY", "JI", "AB")], file = file.path("{temp_dir.replace('\\', '\\\\')}", "r_meta.csv"), row.names=FALSE)
+        write.csv(df_years, file = file.path("{temp_dir_esc_fb}", "r_years.csv"), row.names=FALSE)
+        write.csv(df_sources, file = file.path("{temp_dir_esc_fb}", "r_sources.csv"), row.names=FALSE)
+        write.csv(df_authors, file = file.path("{temp_dir_esc_fb}", "r_authors.csv"), row.names=FALSE)
+        write.csv(M[, c("UT", "TI", "AU", "PY", "JI", "AB")], file = file.path("{temp_dir_esc_fb}", "r_meta.csv"), row.names=FALSE)
         """
         fd_fb, temp_path_fb = tempfile.mkstemp(suffix=".R")
         try:
