@@ -28,8 +28,8 @@
 >   title     = {{SCRIPTMETODOLOGICO: Automated Citation Lineage \& Bibliometrics Pipeline}},
 >   version   = {1.0.0},
 >   year      = {2026},
->   doi       = {10.5281/zenodo.21410548},
->   url       = {https://doi.org/10.5281/zenodo.21410548},
+>   doi       = {10.5281/zenodo.21410712},
+>   url       = {https://doi.org/10.5281/zenodo.21410712},
 >   note      = {ORCID: 0009-0000-6869-3489}
 > }
 > ```
