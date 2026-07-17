@@ -18,13 +18,13 @@
 >
 > **APA 7:**
 > ```
-> Etemadi, J. (2026). SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline (v1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.21410548
+> Aranibar Torres, J. G. (2026). SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline (v1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.21410548
 > ```
 >
 > **BibTeX:**
 > ```bibtex
-> @software{etemadi_2026_scriptmetodologico,
->   author    = {Etemadi, Joaquin},
+> @software{aranibar_2026_scriptmetodologico,
+>   author    = {Aranibar Torres, Joaquin Gabriel},
 >   title     = {{SCRIPTMETODOLOGICO: Automated Citation Lineage \& Bibliometrics Pipeline}},
 >   version   = {1.0.0},
 >   year      = {2026},
@@ -240,4 +240,4 @@ MIT License — see [LICENSE](LICENSE).
 
 ## Author
 
-**Joaquin Etemadi** — [ORCID: 0009-0000-6869-3489](https://orcid.org/0009-0000-6869-3489)
+**Joaquin Gabriel Aranibar Torres** — [ORCID: 0009-0000-6869-3489](https://orcid.org/0009-0000-6869-3489)

@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
-  - family-names: "Etemadi"
-    given-names: "Joaquin"
+  - family-names: "Aranibar Torres"
+    given-names: "Joaquin Gabriel"
     orcid: "https://orcid.org/0009-0000-6869-3489"
 title: "SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline"
 version: 1.0.0
