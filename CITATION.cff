@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 authors:
   - family-names: "Etemadi"
     given-names: "Joaquin"
-    orcid: "https://orcid.org/0000-0000-0000-0000"
+    orcid: "https://orcid.org/0009-0000-6869-3489"
 title: "SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline"
 version: 1.0.0
 date-released: 2026-07-17
