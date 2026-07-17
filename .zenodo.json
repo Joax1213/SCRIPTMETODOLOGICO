@@ -1,0 +1,25 @@
+{
+  "title": "SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline",
+  "description": "A Python CLI tool for automated bibliometric analysis, citation lineage mapping, and systematic review assistance. Integrates OpenAlex, PubMed, and Scopus APIs for multi-source literature search, forward/backward citation tracing, PRISMA 2020 flow diagrams, and R-Bibliometrix scientometric reports.",
+  "creators": [
+    {
+      "name": "Aranibar Torres, Joaquin Gabriel",
+      "orcid": "0009-0000-6869-3489",
+      "affiliation": "Universidad Ricardo Palma"
+    }
+  ],
+  "keywords": [
+    "bibliometrics",
+    "citation-analysis",
+    "science-mapping",
+    "systematic-review",
+    "openalex",
+    "pubmed",
+    "scopus",
+    "PRISMA",
+    "R-bibliometrix"
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "access_right": "open"
+}
