@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+.pytest_cache/
+.bibliometric_cache/
+documentos_temporales/
+
+# Environments
+.env
+.venv
+venv/
+env/
+ENV/
+
+# Output reports and templates (exclude tracking local test outputs)
+*.xlsx
+*.html
+*.md
+!README.md
+!task.md
+!implementation_plan.md
+!walkthrough.md

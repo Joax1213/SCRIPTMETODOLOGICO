@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bibliometric-analyzer"
+version = "1.0.0"
+description = "Science Bibliometrics CLI & API Analyzer (Live Lineage + Batch R-Bibliometrix integration)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+dependencies = [
+    "pandas",
+    "openpyxl",
+    "networkx",
+    "pypdf",
+    "python-dotenv"
+]
+
+[project.scripts]
+bibliometric-analyzer = "bibliometric_analyzer.cli:main"
