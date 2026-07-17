@@ -18,7 +18,7 @@
 >
 > **APA 7:**
 > ```
-> Aranibar Torres, J. G. (2026). SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline (v1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.21410548
+> Aranibar Torres, J. G. (2026). SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline (v1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.21410712
 > ```
 >
 > **BibTeX:**
