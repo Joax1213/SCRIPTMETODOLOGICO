@@ -4,6 +4,7 @@ authors:
   - family-names: "Aranibar Torres"
     given-names: "Joaquin Gabriel"
     orcid: "https://orcid.org/0009-0000-6869-3489"
+    affiliation: "Universidad Ricardo Palma"
 title: "SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline"
 version: 1.0.0
 doi: "10.5281/zenodo.21410548"
