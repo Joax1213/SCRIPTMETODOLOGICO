@@ -110,7 +110,7 @@ def run_interactive_prisma_flow(output_path=None):
         logger.error(f"Error al ejecutar el flujo interactivo de PRISMA: {e}")
 
 
-def analyze_quality_bias_from_excel(input_file):
+def parse_quality_and_bias(input_file):
     bias_data = []
     if not input_file or not input_file.lower().endswith(".xlsx"):
         return None
@@ -182,6 +182,8 @@ El análisis cualitativo de la muestra de **{total_papers} artículos** revela l
     except Exception as e:
         logger.error(f"Error al analizar calidad y sesgo en Excel: {e}")
     return None
+
+analyze_quality_bias_from_excel = parse_quality_and_bias
 
 def generate_rqs_markdown(input_file):
     """Auto-genera preguntas de investigación (RQs) dinámicas a partir de las keywords más frecuentes del corpus."""
