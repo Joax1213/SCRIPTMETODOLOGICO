@@ -13,11 +13,11 @@ from .utils import parse_author_name, format_authors_list, get_fallback_year, ge
 from .scopus_client import get_scopus_paper_data, get_scopus_abstract, get_citing_papers_scopus
 from .openalex_client import get_openalex_paper_data, get_citing_papers_openalex, rebuild_abstract_inverted_index
 from .pubmed_client import get_pubmed_paper_data, get_citing_papers_pubmed
+from .themes import get_theme, generate_qualitative_for_theme
 
 logger = logging.getLogger("bibliometric_analyzer")
 
 def download_pdf(url, dest_path, verbose=False, verify_ssl=True):
-    """Descarga un PDF desde una URL y lo guarda localmente."""
     ctx = get_ssl_context(verify_ssl)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -31,7 +31,6 @@ def download_pdf(url, dest_path, verbose=False, verify_ssl=True):
         return False
 
 def extract_text_from_pdf(pdf_path):
-    """Extrae texto plano de un archivo PDF usando pypdf."""
     try:
         import pypdf
         reader = pypdf.PdfReader(pdf_path)
@@ -46,7 +45,6 @@ def extract_text_from_pdf(pdf_path):
         return ""
 
 def index_local_pdfs(pdf_dir, verbose=False):
-    """Escanea un directorio local e indexa archivos PDF por su DOI detectado o por título."""
     pdf_mapping = {}
     if not pdf_dir or not os.path.exists(pdf_dir):
         return pdf_mapping
@@ -80,7 +78,6 @@ def index_local_pdfs(pdf_dir, verbose=False):
     return pdf_mapping
 
 def get_unpaywall_pdf_url(doi, contact_email, verbose=False, verify_ssl=True):
-    """Busca una versión legal en acceso abierto para un DOI usando la API de Unpaywall."""
     clean_doi = doi.replace("https://doi.org/", "").strip()
     email_param = contact_email if contact_email else "user@example.com"
     url = f"https://api.unpaywall.org/v2/{clean_doi}?email={email_param}"
@@ -105,100 +102,11 @@ def get_unpaywall_pdf_url(doi, contact_email, verbose=False, verify_ssl=True):
     return None
 
 def generate_heuristic_qualitative_data(title, abstract, full_text=None, theme="general"):
-    """Genera descripciones heurísticas sobre descubrimientos y aportes al tema."""
+    """Genera descubrimientos y aportes cualitativos usando la lógica del tema seleccionado."""
     text_to_analyze = full_text if (full_text and len(full_text) > len(abstract)) else abstract
-
-    if not text_to_analyze or "Abstract no disponible" in text_to_analyze or len(text_to_analyze) < 30:
-        return (
-            "Investigación sobre bioprocesos, regeneración o biomoléculas en biotecnología.",
-            "Respaldo directo de la literatura científica para el marco teórico de la investigación."
-        )
-
-    discoveries = ""
-    aporte = ""
-
-    if theme == "phytochemistry":
-        yield_matches = re.findall(r"(?:\d+(?:\.\d+)?)\s*(?:mg/g|ug/g|g/kg|mg/L|mg\s+g\s*-1)", text_to_analyze, re.IGNORECASE)
-        hplc_matches = re.findall(r"(?:HPLC|cromatografía|chromatography|LC-MS|GC-MS|spectrophotometr\w*)", text_to_analyze, re.IGNORECASE)
-        elicitor_matches = re.findall(r"(?:elicitor|elicitation|tyrosine|tirosina|methyl jasmonate|salicylic acid|chitosan|yeast extract|precursor)", text_to_analyze, re.IGNORECASE)
-
-        desc_parts = []
-        if yield_matches:
-            unique_yields = list(dict.fromkeys(yield_matches))[:2]
-            desc_parts.append(f"Reporta rendimientos cuantitativos de metabolitos en rangos de {', '.join(unique_yields)}.")
-        if hplc_matches:
-            unique_tech = list(dict.fromkeys([t.upper() for t in hplc_matches]))[:2]
-            desc_parts.append(f"Valida el perfil fitoquímico mediante técnicas instrumentales: {', '.join(unique_tech)}.")
-        if elicitor_matches:
-            unique_el = list(dict.fromkeys([e.lower() for e in elicitor_matches]))[:2]
-            desc_parts.append(f"Estudia el efecto fisiológico de inductores y precursores: {', '.join(unique_el)}.")
-
-        if desc_parts:
-            discoveries = " ".join(desc_parts)
-        else:
-            sentences = re.split(r'\. (?=[A-Z])', text_to_analyze)
-            for sent in sentences:
-                if any(w in sent.lower() for w in ["showed", "demonstrated", "results", "found", "concluded", "revealed", "yield", "hplc"]):
-                    discoveries = sent.strip()
-                    break
-
-        if not discoveries:
-            discoveries = "Análisis fitoquímico y de inducción de metabolitos secundarios en tejido vegetal."
-
-        title_lower = title.lower()
-        if "vicia" in title_lower or "faba" in title_lower or "haba" in title_lower or "broad bean" in title_lower:
-            aporte = "Aporta parámetros clave para optimizar la biosíntesis de L-DOPA y regular la respuesta de polifenol oxidasas (PPO) en leguminosas."
-        elif yield_matches:
-            aporte = "Proporciona bases experimentales de rendimiento de metabolitos para el escalamiento de procesos de elicitación vegetal."
-        else:
-            aporte = "Aporta a la optimización operacional y fisiológica de la biosíntesis de compuestos bioactivos en modelos vegetales."
-
-    else:
-        # Tema General
-        sentences = []
-        if full_text and len(full_text) > 3000:
-            conclusions_chunk = full_text[-2500:]
-            sentences = re.split(r'\. (?=[A-Z])', conclusions_chunk)
-        else:
-            sentences = re.split(r'\. (?=[A-Z])', text_to_analyze)
-
-        for sent in sentences:
-            if any(w in sent.lower() for w in ["conclude", "conclusion", "overall", "therefore", "summary", "suggest", "indicates", "demonstrate"]):
-                clean_sent = sent.strip()
-                if 30 < len(clean_sent) < 200:
-                    discoveries = clean_sent
-                    if not discoveries.endswith("."):
-                        discoveries += "."
-                    break
-
-        if not discoveries:
-            for sent in re.split(r'\. (?=[A-Z])', text_to_analyze):
-                if any(w in sent.lower() for w in ["showed", "demonstrated", "results", "found", "revealed", "we report"]):
-                    discoveries = sent.strip()
-                    if not discoveries.endswith("."):
-                        discoveries += "."
-                    break
-
-        if not discoveries:
-            discoveries = f"Estudio enfocado en el análisis, caracterización y modelado de {title.lower()}."
-
-        title_lower = title.lower()
-        if any(w in title_lower for w in ["bioreactor", "culture", "bioprocess", "production", "titer", "yield", "fermentation", "media"]):
-            aporte = "Proporciona parámetros y metodologías críticas para la optimización de bioprocesos y rendimiento en biorreactores."
-        elif any(w in title_lower for w in ["vector", "lentiviral", "gene", "transduction", "delivery", "transfection", "plasmid"]):
-            aporte = "Aporta bases para el diseño y optimización de vectores y sistemas de transferencia génica a nivel celular."
-        elif any(w in title_lower for w in ["stem cell", "differentiation", "regeneration", "tissue", "cell therapy", "pluripotent", "organoid"]):
-            aporte = "Sustenta las aplicaciones de terapia celular y regeneración de tejidos basadas en diferenciación celular."
-        else:
-            aporte = "Aporta evidencia experimental y teórica sobre los mecanismos moleculares y biotecnológicos analizados."
-
-    return discoveries, aporte
+    return generate_qualitative_for_theme(theme, title, text_to_analyze)
 
 def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_email, cache=None, verify_ssl=True):
-    """
-    Intenta recuperar metadatos consolidados de un DOI usando las APIs habilitadas
-    en orden de disponibilidad, leyendo/escribiendo de la caché.
-    """
     clean_doi = doi.replace("https://doi.org/", "").strip().lower()
     
     if cache:
@@ -209,7 +117,6 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
     payload = None
     source_api = "None"
     
-    # 1. Intentar Scopus
     if api_source in ["scopus", "all"] and scopus_key:
         logger.debug(f"[Lineage] Intentando recuperar {clean_doi} en Scopus...")
         scopus_data = get_scopus_paper_data(clean_doi, scopus_key, verify_ssl=verify_ssl)
@@ -233,11 +140,10 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
                 "Revista": journal,
                 "Abstract": abstract,
                 "raw_api": "scopus",
-                "referenced_works": [] # Scopus search API no entrega referenced_works directamente de forma simple
+                "referenced_works": []
             }
             source_api = "scopus"
 
-    # 2. Intentar PubMed
     if not payload and api_source in ["pubmed", "all"]:
         logger.debug(f"[Lineage] Intentando recuperar {clean_doi} en PubMed...")
         pubmed_data = get_pubmed_paper_data(clean_doi, pubmed_key, verify_ssl=verify_ssl)
@@ -254,7 +160,6 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
             }
             source_api = "pubmed"
 
-    # 3. Fallback a OpenAlex
     if not payload and api_source in ["openalex", "all"]:
         logger.debug(f"[Lineage] Intentando recuperar {clean_doi} en OpenAlex...")
         alex_data = get_openalex_paper_data(clean_doi, contact_email, verify_ssl=verify_ssl)
@@ -271,7 +176,6 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
             journal = source.get("display_name", "N/A") if isinstance(source, dict) else "N/A"
             
             abstract = rebuild_abstract_inverted_index(alex_data.get("abstract_inverted_index")) if "abstract_inverted_index" in alex_data else alex_data.get("abstract", "Abstract no disponible.")
-            
             referenced_works = alex_data.get("referenced_works", [])
             
             payload = {
@@ -283,12 +187,11 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
                 "Abstract": abstract,
                 "raw_api": "openalex",
                 "referenced_works": referenced_works,
-                "raw_openalex_json": alex_data # Guardar datos crudos para descargas
+                "raw_openalex_json": alex_data
             }
             source_api = "openalex"
 
     if payload:
-        # Completar abstract faltante cruzando con OpenAlex si es posible
         if not payload.get("Abstract") or "Abstract no disponible" in payload.get("Abstract"):
             logger.debug(f"[Lineage] Cruzando abstract vacío de {clean_doi} con OpenAlex...")
             alex_fallback = get_openalex_paper_data(clean_doi, contact_email, verify_ssl=verify_ssl)
@@ -311,9 +214,8 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
         
     return None
 
-def validate_paper_criteria(title, abstract, year, full_text=None, start_year=None, end_year=None, precursor_filter=False):
-    """Filtra artículos dinámicamente según el rango de años y presencia de precursor con concentraciones."""
-    # 1. Validar año
+def validate_paper_criteria(title, abstract, year, full_text=None, start_year=None, end_year=None, precursor_filter=False, precursor_keywords=None):
+    """Valida los artículos según año y filtros dinámicos de precursor de la disciplina."""
     if start_year is not None or end_year is not None:
         try:
             y = int(year)
@@ -327,12 +229,10 @@ def validate_paper_criteria(title, abstract, year, full_text=None, start_year=No
             logger.debug(f"[Filtro Año] Año inválido '{year}'. Descartado.")
             return False
 
-    # 2. Validar precursores y concentraciones
-    if precursor_filter:
+    if precursor_filter and precursor_keywords:
         text = f"{title} {abstract or ''} {full_text or ''}".lower()
-        has_precursor = ("tyrosine" in text or "tirosina" in text)
+        has_precursor = any(pk.lower() in text for pk in precursor_keywords)
         
-        # Buscar términos o abreviaturas asociadas a concentraciones
         has_concentration = (
             "concentration" in text or 
             "concentración" in text or 
@@ -348,7 +248,7 @@ def validate_paper_criteria(title, abstract, year, full_text=None, start_year=No
         )
         
         if not (has_precursor and has_concentration):
-            logger.debug(f"[Filtro Precursor] Falta mención de tirosina o concentración en texto. Descartado.")
+            logger.debug(f"[Filtro Precursor] Falta mención de precursor/concentración en texto. Descartado.")
             return False
 
     return True
@@ -356,12 +256,12 @@ def validate_paper_criteria(title, abstract, year, full_text=None, start_year=No
 def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_key="", pubmed_key="", contact_email="",
                          verbose=False, full_text=False, pdf_dir=None, theme="general", max_refs=12, depth=1, cache=None, verify_ssl=True, max_total_nodes=150,
                          start_year=None, end_year=None, precursor_filter=False):
-    """
-    Orquesta la construcción del linaje cienciométrico y cualitativo de primer grado o recursivo.
-    Soporta opcionalidad de APIs, caché JSON y reporte detallado de incidencias.
-    """
-    logger.info(f"[Linaje] Iniciando rastreo de linaje para DOI semilla: {doi} (Profundidad: {depth}, Max Refs: {max_refs})")
+    logger.info(f"[Linaje] Iniciando rastreo para DOI semilla: {doi} (Profundidad: {depth}, Max Refs: {max_refs}, Tema: {theme})")
     
+    theme_spec = get_theme(theme)
+    precursor_keywords = theme_spec.get("precursor_keywords", [])
+    bfs_filter_keywords = theme_spec.get("bfs_filter_keywords", [])
+
     local_pdfs = index_local_pdfs(pdf_dir, verbose=verbose) if pdf_dir else {}
     documentos_temporales_dir = "documentos_temporales"
     if full_text:
@@ -372,12 +272,9 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
     edges = []
     failed_nodes = []
     
-    # Cola de procesamiento para BFS recursivo: (doi_actual, nivel_actual, pilar_original)
-    # pilar_original indica si es "Ancestros", "Descendientes" o "Semilla"
     queue = deque([(doi.strip().lower(), 0, "Semilla")])
     processed_dois = set()
 
-    # Procesar cualitativamente un artículo
     def process_paper_qualitative(title, abstract, doi_val, alex_work_json=None):
         clean_doi = doi_val.replace("https://doi.org/", "").strip().lower()
         title_clean = re.sub(r'[^a-z0-9]', '', title.lower())
@@ -426,11 +323,9 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
         desc, app = generate_heuristic_qualitative_data(title, abstract, full_text=extracted_text, theme=theme)
         return desc, app, source_type, extracted_text
 
-    # Bucle principal de rastreo
     while queue:
         curr_doi, curr_level, pilar = queue.popleft()
         
-        # Control de explosión BFS (techo de nodos totales)
         if len(processed_dois) >= max_total_nodes:
             logger.warning(f"[Linaje] Se ha alcanzado el límite máximo de nodos totales ({max_total_nodes}). Deteniendo la expansión del grafo.")
             break
@@ -441,7 +336,6 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
         
         logger.info(f"\n[Linaje] Procesando [{curr_doi}] Nivel {curr_level} ({pilar})...")
         
-        # Recuperar metadatos unificados
         paper_data = get_paper_metadata_unified(curr_doi, api_source, scopus_key, pubmed_key, contact_email, cache, verify_ssl=verify_ssl)
         if not paper_data:
             logger.warning(f"[-] No se pudieron obtener metadatos para DOI/ID: {curr_doi}")
@@ -449,7 +343,7 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
                 "DOI": curr_doi,
                 "Nivel": curr_level,
                 "Pilar": pilar,
-                "Razón": "Metadatos no encontrados en ninguna API habilitada o error de conexión."
+                "Razón": "Metadatos no encontrados en ninguna API habilitada."
             })
             continue
 
@@ -463,32 +357,28 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
         
         desc, app, src_type, text_extracted = process_paper_qualitative(title, abstract, curr_doi, alex_json)
         
-        # Validar criterios dinámicos (año y precursores)
-        # Para niveles > 0, relajar el filtro de precursor si el usuario lo activó,
-        # requiriendo solo que mencione "vicia faba", "dopa", "tyrosine", "tirosina", "legume", "haba"
-        # para que la red cienciométrica no se quede con 1 solo nodo
         is_seed = (curr_level == 0)
         current_precursor_filter = precursor_filter
-        if not is_seed and precursor_filter:
-            current_precursor_filter = False
+        
+        if not is_seed and bfs_filter_keywords:
             text_lower = f"{title} {abstract or ''} {text_extracted or ''}".lower()
-            if not any(w in text_lower for w in ["vicia", "faba", "dopa", "tyrosine", "tirosina", "legume", "haba"]):
-                logger.info(f"   [-] Artículo [{curr_doi}] ({year}) excluido por no tener palabras clave generales de fitoquímica/haba.")
+            if not any(w.lower() in text_lower for w in bfs_filter_keywords):
+                logger.info(f"   [-] Artículo [{curr_doi}] ({year}) excluido por no coincidir con palabras clave del tema '{theme}'.")
                 failed_nodes.append({
                     "DOI": curr_doi,
                     "Nivel": curr_level,
                     "Pilar": pilar,
-                    "Razón": f"Excluido por filtro temático suave (Nivel > 0)."
+                    "Razón": f"Excluido por filtro temático de disciplina (Nivel > 0)."
                 })
                 continue
 
-        if not validate_paper_criteria(title, abstract, year, text_extracted, start_year, end_year, current_precursor_filter):
+        if not validate_paper_criteria(title, abstract, year, text_extracted, start_year, end_year, current_precursor_filter, precursor_keywords):
             logger.info(f"   [-] Artículo [{curr_doi}] ({year}) excluido por criterios de filtrado dinámico (Año/Precursor).")
             failed_nodes.append({
                 "DOI": curr_doi,
                 "Nivel": curr_level,
                 "Pilar": pilar,
-                "Razón": f"Excluido por filtro: Año {year} (Rango: {start_year}-{end_year}) o términos de precursor faltantes."
+                "Razón": f"Excluido por filtro: Año {year} (Rango: {start_year}-{end_year}) o precursor faltante."
             })
             continue
             
@@ -508,16 +398,11 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
             "Nivel": curr_level
         }
         
-        # Detener la expansión si alcanzamos la profundidad límite
         if curr_level >= depth:
             continue
             
-        # 1. Expandir referencias (Ancestros) - Citas hacia atrás
         logger.info(f"  [Ancestros] Obteniendo referencias para {curr_doi}...")
-        
-        # Comprobar si hay referencias disponibles
         if not referenced_works and api_source in ["openalex", "all"]:
-            # Si no las tiene cargadas, intentar OpenAlex de forma explícita
             alex_json = get_openalex_paper_data(curr_doi, contact_email, verify_ssl=verify_ssl)
             if alex_json:
                 referenced_works = alex_json.get("referenced_works", [])
@@ -529,9 +414,7 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
         logger.info(f"  - Analizando referencias [{actual_max_refs} de {len(referenced_works)} disponibles]")
         
         for idx, ref_openalex_id in enumerate(referenced_works[:actual_max_refs]):
-            # Extraer DOI o ID de OpenAlex
             ref_doi = ref_openalex_id.split("/")[-1]
-            # Consultar metadatos para la referencia
             ref_data = get_paper_metadata_unified(ref_doi, api_source, scopus_key, pubmed_key, contact_email, cache, verify_ssl=verify_ssl)
             if ref_data:
                 ref_clean_doi = ref_data["DOI"]
@@ -547,19 +430,13 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
                 })
             time.sleep(0.1)
 
-        # 2. Expandir citantes (Descendientes) - Citas hacia adelante
         logger.info(f"  [Descendientes] Obteniendo citantes para {curr_doi}...")
         citing_papers = []
         
-        # Consultar Scopus si está activo
         if api_source in ["scopus", "all"] and scopus_key:
             citing_papers = get_citing_papers_scopus(curr_doi, title, scopus_key, verbose=verbose, verify_ssl=verify_ssl)
-            
-        # Consultar PubMed si está activo
         if not citing_papers and api_source in ["pubmed", "all"]:
             citing_papers = get_citing_papers_pubmed(curr_doi, pubmed_key, count=20, verify_ssl=verify_ssl)
-            
-        # Fallback a OpenAlex si no hay resultados previos
         if not citing_papers and api_source in ["openalex", "all"]:
             citing_papers = get_citing_papers_openalex(curr_doi, contact_email, count=20, verify_ssl=verify_ssl)
             
@@ -570,14 +447,12 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
             edges.append((cp_doi, curr_doi, "Cita a"))
             queue.append((cp_doi, curr_level + 1, "Descendientes"))
             
-    # --- MODELADO DE RED ---
-    # Filtrar arcos para incluir solo aquellos cuyos extremos existan en el diccionario de nodos válidos
     valid_edges = []
     for source, target, rel in edges:
         if source in nodes and target in nodes:
             valid_edges.append((source, target, rel))
             
-    logger.info(f"\n[Grafo] Construcción completada: {len(nodes)} nodos, {len(valid_edges)} conexiones filtradas (de {len(edges)} totales).")
+    logger.info(f"\n[Grafo] Construcción completada: {len(nodes)} nodos, {len(valid_edges)} conexiones filtradas.")
     
     G = nx.DiGraph()
     G.add_nodes_from(nodes.keys())
@@ -592,19 +467,17 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
             nodes[node_id]["PageRank"] = score
             nodes[node_id]["Centrality"] = degree_centrality[node_id]
 
-    # Escribir reportes
     if output_md:
         write_markdown_knowledge_base_unified(nodes, valid_edges, G, failed_nodes, output_md)
         
     if output_html:
         from .visualizer import write_html_network_visualization
-        write_html_network_visualization(nodes, valid_edges, output_html, verify_ssl=verify_ssl)
+        write_html_network_visualization(nodes, valid_edges, output_html, verify_ssl=verify_ssl, theme_name=theme)
         
     return nodes, valid_edges
 
 def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
-    """Genera una base de conocimiento en Markdown que detalla los nodos, conexiones y errores de la red."""
-    logger.info(f"[Markdown] Compilando reporte de base de conocimiento en: {path}")
+    logger.info(f"[Markdown] Compilando reporte en: {path}")
     
     nodos_totales = len(G)
     conexiones_totales = G.number_of_edges()
@@ -634,7 +507,6 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
         autores_corto = auth['Autores'].split(',')[0] if ',' in auth['Autores'] else auth['Autores']
         md.append(f"    {idx+1}. **{autores_corto} ({auth['Año']})** - PageRank: {auth.get('PageRank', 0):.4f} - Centralidad: {auth.get('Centrality', 0):.4f} · *{auth['Revista']}*")
     
-    # Registrar incidentes de red o fallos
     md.append("\n## 2. Reporte de Incidentes de Extracción")
     if failed_nodes:
         md.append(f"Se registraron **{len(failed_nodes)}** incidentes de red o inconsistencias de datos al armar el linaje:")
@@ -646,7 +518,6 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
         md.append("¡Extracción completada sin incidentes de red ni fallos de datos!")
         
     md.append("\n---\n")
-    
     md.append("## 3. Mapa de Conexiones Dirigidas (El Linaje de Citas)")
     
     for n_id, n_data in nodes.items():
@@ -659,7 +530,6 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
         md.append(f"*   **Descubrimientos Principales:** {n_data['Descubrimientos Principales']}")
         md.append(f"*   **Aporte al Tema:** {n_data['Aporte al Tema']}")
         
-        # Ancestros
         ancestros = [target for source, target in G.edges() if source == n_id]
         md.append("*   **Ancestros Directos (A quién cita):**")
         if ancestros:
@@ -673,7 +543,6 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
         else:
             md.append("    - *Ninguno identificado en el grafo local*")
             
-        # Descendientes
         descendientes = [source for source, target in G.edges() if target == n_id]
         md.append("*   **Descendientes Directos (Quién lo cita):**")
         if descendientes:

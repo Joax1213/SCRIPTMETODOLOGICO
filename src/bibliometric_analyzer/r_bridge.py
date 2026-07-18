@@ -1031,23 +1031,20 @@ def run_r_native_analysis(rscript_path, input_file, output_html, output_md):
                                 
                     pr_key = nx.pagerank(G_key) if len(G_key) > 0 else {n: 1.0 for n in G_key.nodes()}
                     
+                    from .visualizer import auto_classify_axes
+                    
+                    # Extraer nombres de keywords y clasificar en caliente
+                    all_kws = [str(n) for n in G_key.nodes()]
+                    axis_map, _ = auto_classify_axes(all_kws)
+                    
                     for node_name in G_key.nodes():
                         rank = pr_key.get(node_name, 0.05)
                         size = 12 + (rank * 180)
                         
                         node_lower = str(node_name).lower()
-                        if any(w in node_lower for w in ["faba", "broad", "elicitation", "germination", "seedling", "sprout", "growth", "peroxidase", "germinación", "brotes"]):
-                            color_bg = "#1B4332"
-                            eje = "Eje 1: Fisiología de Vicia faba y Elicitación de L-DOPA"
-                        elif any(w in node_lower for w in ["hplc", "spectrophotometric", "chromatography", "quantification", "detection", "analytical", "quality", "validation", "cuantificación"]):
-                            color_bg = "#028090"
-                            eje = "Eje 2: Control de Calidad y Cuantificación Analítica (HPLC/MS)"
-                        elif any(w in node_lower for w in ["biosynthesis", "pathway", "enzyme", "oxidase", "ppo", "tyrosinase", "expression", "transcript", "genetics", "biosíntesis", "genes"]):
-                            color_bg = "#A3B18A"
-                            eje = "Eje 3: Regulación Genética y Ruta Biosintética"
-                        else:
-                            color_bg = "#BC6C25"
-                            eje = "Eje 4: Aplicaciones Clínicas y Tratamiento del Parkinson"
+                        kw_info = axis_map.get(node_lower, {"axis": "Tema General", "color": "#BC6C25"})
+                        color_bg = kw_info["color"]
+                        eje = kw_info["axis"]
                             
                         # Identificar qué artículos de la auditoría contienen esta palabra clave
                         linked_docs = []
@@ -1062,20 +1059,7 @@ def run_r_native_analysis(rscript_path, input_file, output_html, output_md):
                                     "title": doc_data["Título"]
                                 })
                                 
-                        # Generar explicación técnica específica para la tesis de Vicia faba
-                        term_lower = str(node_name).lower()
-                        if any(w in term_lower for w in ["faba", "broad", "germinación", "germination", "seedling", "sprout", "brotes"]):
-                            explicacion = "Convergencia fisiológica: Evalúa el desarrollo de plántulas de Vicia faba bajo elicitación exógena, analizando la biomasa, germinación y biosíntesis de L-DOPA en etapas tempranas."
-                        elif any(w in term_lower for w in ["elicitation", "elicitor", "tirosina", "tyrosine", "elicita"]):
-                            explicacion = "Mecanismo de elicitación: La tirosina exógena actúa como precursor directo y señal metabólica que sobre-regula la biosíntesis de L-DOPA. Sin embargo, dosis elevadas desencadenan inhibición por retroalimentación o la activación de polifenol oxidasas (PPO) que oxidan la L-DOPA a dopacromos."
-                        elif any(w in term_lower for w in ["hplc", "chromatography", "quantification", "spectrophotometric", "cuantificación"]):
-                            explicacion = "Resolución analítica: Se enfoca en la precisión de las técnicas analíticas (HPLC de fase reversa, detección UV/MS) para determinar de forma exacta la concentración de L-DOPA vegetal, reduciendo discrepancias por interferencias de otros aminoácidos o polifenoles."
-                        elif any(w in term_lower for w in ["biosynthesis", "pathway", "enzyme", "oxidase", "ppo", "tyrosinase", "biosíntesis"]):
-                            explicacion = "Regulación de la ruta: Involucra la cascada enzimática donde la tirosinasa (monofenol monooxigenasa) hidroxila la L-tirosina a L-DOPA, y la competencia con la polifenol oxidasa (PPO) que degrada el metabolito."
-                        elif any(w in term_lower for w in ["parkinson", "dopamine", "levodopa", "clinical", "dopa", "terapéutico"]):
-                            explicacion = "Aplicación clínica y farmacológica: Trata sobre la biodisponibilidad de la levodopa natural proveniente de Vicia faba en comparación con la levodopa sintética combinada con inhibidores de dopa-descarboxilasa (carbidopa), minimizando efectos secundarios motores en pacientes."
-                        else:
-                            explicacion = f"Convergencia temática: Concepto clave que vincula el metabolismo de aminoácidos aromáticos y el desarrollo vegetal de Fabáceas en el marco del semillero."
+                        explicacion = f"Cluster temático que agrupa las investigaciones asociadas con: {eje.split(': ')[-1]}."
                             
                         tooltip = f"<b>Término:</b> {node_name}<br><b>Eje:</b> {eje}<br><b>Frecuencia de Co-ocurrencia (PageRank):</b> {rank:.4f}"
                         

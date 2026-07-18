@@ -13,11 +13,11 @@ from .matrix_generator import generate_audit_matrix_template, run_interactive_pr
 from .scopus_client import get_scopus_paper_data, get_scopus_abstract
 from .openalex_client import get_openalex_paper_data, rebuild_abstract_inverted_index, search_openalex_works
 from .pubmed_client import get_pubmed_paper_data, search_pubmed_works
+from .themes import get_all_theme_names
 
 logger = logging.getLogger("bibliometric_analyzer")
 
 def verify_metadata_flow(doi, scopus_key, pubmed_key, contact_email, verbose=False, verify_ssl=True):
-    """Audita y muestra los metadatos devueltos por cada API disponible para un DOI."""
     print("=" * 60)
     print(f"AUDITORÍA DE METADATOS PARA DOI: {doi}")
     print("=" * 60)
@@ -76,7 +76,6 @@ def verify_metadata_flow(doi, scopus_key, pubmed_key, contact_email, verbose=Fal
 
 
 def install_dependencies():
-    """Instala las dependencias requeridas del paquete."""
     import subprocess
     logger.info("Instalando dependencias requeridas...")
     try:
@@ -88,7 +87,6 @@ def install_dependencies():
         sys.exit(1)
 
 def check_dependencies():
-    """Verifica que todas las dependencias estén instaladas."""
     missing = []
     for dep in ["pandas", "openpyxl", "networkx", "pypdf", "dotenv"]:
         try:
@@ -105,13 +103,10 @@ def check_dependencies():
 
 
 def _find_pandoc():
-    """Busca Pandoc en el PATH del sistema o en ubicaciones comunes de Windows."""
-    # Primero intentar shutil.which
     pandoc = shutil.which("pandoc")
     if pandoc:
         return pandoc
     
-    # Buscar rutas de WinGet genéricas (sin nombres de usuario hardcodeados)
     import glob
     winget_pattern = os.path.join(
         os.environ.get("LOCALAPPDATA", ""),
@@ -124,10 +119,7 @@ def _find_pandoc():
 
 
 def load_environment_variables():
-    """Carga variables de entorno desde el .env local o la ubicación global del usuario como fallback."""
-    # Primero cargar el .env estándar local
     load_dotenv()
-    # Si no están configuradas las variables principales, buscar en el home del usuario (~/.bibliometric_analyzer/.env)
     if not os.environ.get("SCOPUS_API_KEY") or not os.environ.get("CONTACT_EMAIL"):
         _env_fallback = os.path.join(os.path.expanduser("~"), ".bibliometric_analyzer", ".env")
         if os.path.exists(_env_fallback):
@@ -135,7 +127,6 @@ def load_environment_variables():
 
 def main():
     load_environment_variables()
-    # Detección y registro de Pandoc al arrancar
     pandoc_dir = _find_pandoc()
     if pandoc_dir:
         parent_dir = os.path.dirname(pandoc_dir) if not os.path.isdir(pandoc_dir) else pandoc_dir
@@ -143,7 +134,7 @@ def main():
             os.environ["PATH"] = os.environ["PATH"] + os.pathsep + parent_dir
 
     parser = argparse.ArgumentParser(
-        description="Bibliometric Analyzer — Science Lineage & Bibliometrics CLI (SoftwareX edition)"
+        description="Bibliometric Analyzer — Science Lineage & Bibliometrics CLI"
     )
 
     # General
@@ -154,19 +145,19 @@ def main():
     parser.add_argument("--verbose", action="store_true",
                         help="Activa el modo verbose con logs detallados")
     parser.add_argument("--max-total-nodes", type=int, default=150,
-                        help="Límite máximo de nodos a procesar en total para evitar explosiones BFS (por defecto: 150)")
+                        help="Límite máximo de nodos a procesar en total (por defecto: 150)")
     parser.add_argument("--verify-ssl", action="store_true", default=True,
-                        help="Habilita la verificación SSL para todas las peticiones (por defecto: True)")
+                        help="Habilita la verificación SSL (por defecto: True)")
     parser.add_argument("--no-verify-ssl", action="store_false", dest="verify_ssl",
-                        help="Deshabilita la verificación SSL para todas las peticiones (no recomendado, solo para pruebas locales)")
+                        help="Deshabilita la verificación SSL")
     parser.add_argument("--clear-cache", action="store_true",
                         help="Limpia la caché local de consultas de API")
     parser.add_argument("--pipeline", action="store_true",
-                        help="Ejecuta la secuencia completa de investigación de forma 100% automatizada a partir de un tema")
+                        help="Ejecuta la secuencia completa de investigación automatizada")
     parser.add_argument("--search-query", type=str, default=None,
-                        help="Consulta de búsqueda o tema de investigación para la secuencia automatizada")
+                        help="Consulta de búsqueda para encontrar el paper semilla")
     parser.add_argument("--cache-dir", type=str, default=None,
-                        help="Directorio de caché personalizado (por defecto: ~/.bibliometric_cache)")
+                        help="Directorio de caché personalizado")
 
     # API Source
     parser.add_argument("--api-source", type=str, default="all",
@@ -177,22 +168,25 @@ def main():
     parser.add_argument("--linaje", action="store_true",
                         help="Ejecuta rastreo de linaje científico por DOI")
     parser.add_argument("--doi", type=str,
-                        help="DOI semilla para el linaje")
+                        help="DOI semilla para el linaje o para la etapa 1 del pipeline")
+    parser.add_argument("--seed-mode", type=str, default="search",
+                        choices=["search", "doi"],
+                        help="Modo de entrada de semilla: 'search' (búsqueda automática), 'doi' (DOI aportado por el usuario)")
     parser.add_argument("--max-refs", type=int, default=12,
-                        help="Número máximo de referencias ancestro a analizar por nodo (0=sin límite, por defecto: 12)")
+                        help="Número máximo de referencias ancestro (por defecto: 12)")
     parser.add_argument("--depth", type=int, default=1,
-                        help="Profundidad recursiva del linaje (por defecto: 1 = primer grado)")
+                        help="Profundidad recursiva del linaje (por defecto: 1)")
     parser.add_argument("--full-text", action="store_true",
                         help="Descarga y lee texto completo de PDFs en Open Access")
     parser.add_argument("--pdf-dir", type=str,
-                        help="Carpeta local con PDFs para vinculación offline")
+                        help="Carpeta local con PDFs offline")
     parser.add_argument("--theme", type=str, default="general",
-                        choices=["general", "phytochemistry"],
-                        help="Tema de análisis cualitativo (por defecto: general)")
+                        choices=get_all_theme_names(),
+                        help=f"Tema de análisis disciplinario (opciones: {', '.join(get_all_theme_names())})")
     parser.add_argument("--start-year", type=int, default=None,
-                        help="Año de inicio para filtrar la investigación (opcional)")
+                        help="Año de inicio para filtrar (opcional)")
     parser.add_argument("--end-year", type=int, default=None,
-                        help="Año de fin para filtrar la investigación (opcional)")
+                        help="Año de fin para filtrar (opcional)")
     parser.add_argument("--precursor-filter", action="store_true",
                         help="Activa el filtrado de precursores y sus concentraciones")
 
@@ -202,38 +196,36 @@ def main():
     parser.add_argument("--output-md", type=str,
                         help="Ruta de la base de conocimiento Markdown de salida")
     parser.add_argument("--output", type=str,
-                        help="Ruta de archivo de salida general (Excel, Mermaid, etc.)")
+                        help="Ruta de archivo de salida general (Excel)")
     parser.add_argument("--output-dir", type=str,
-                        help="Carpeta donde se guardarán todos los archivos generados por el pipeline")
+                        help="Carpeta de salida para todos los archivos generados")
 
     # Motores batch
     parser.add_argument("--input", type=str,
-                        help="Ruta de archivo de entrada CSV/BibTeX/Excel para motores batch")
+                        help="Ruta de archivo de entrada para motores batch")
 
     # Revisión Sistemática
     parser.add_argument("--generate-matrix", action="store_true",
-                        help="Genera plantilla Excel de auditoría y calidad estructurada")
+                        help="Genera plantilla Excel de auditoría estructurada")
     parser.add_argument("--prisma-flow", action="store_true",
                         help="Asistente interactivo de flujo PRISMA")
     parser.add_argument("--verify-metadata", action="store_true",
-                        help="Audita metadatos por API (Scopus, OpenAlex, PubMed)")
+                        help="Audita metadatos por API")
 
     # R Integration
     parser.add_argument("--check-r", action="store_true",
                         help="Verifica e instala dependencias nativas de R")
     parser.add_argument("--biblioshiny", action="store_true",
-                        help="Lanza la aplicación web Biblioshiny en R")
+                        help="Lanza Biblioshiny en R")
     parser.add_argument("--r-native", action="store_true",
                         help="Ejecuta el análisis cienciométrico nativo de R")
     parser.add_argument("--r-report", action="store_true",
-                        help="Genera reporte formal R Markdown en HTML")
+                        help="Genera reporte formal R Markdown")
 
     args = parser.parse_args()
 
-    # --- Logging ---
     setup_logging(verbose=args.verbose)
 
-    # --- Credenciales opcionales desde entorno ---
     scopus_key = os.environ.get("SCOPUS_API_KEY", "")
     pubmed_key = os.environ.get("NCBI_API_KEY") or os.environ.get("PUBMED_API_KEY") or ""
     contact_email = os.environ.get("CONTACT_EMAIL", "")
@@ -241,18 +233,16 @@ def main():
     if not scopus_key:
         logger.info("[Config] SCOPUS_API_KEY no configurada. Scopus deshabilitado.")
     if not pubmed_key:
-        logger.info("[Config] NCBI_API_KEY/PUBMED_API_KEY no configuradas. PubMed usará límite de velocidad reducido.")
+        logger.info("[Config] NCBI_API_KEY/PUBMED_API_KEY no configuradas. PubMed usará velocidad reducida.")
     if not contact_email:
         logger.info("[Config] CONTACT_EMAIL no configurado. OpenAlex usará User-Agent genérico.")
 
-    # --- Caché ---
     cache = JSONCache(cache_dir=args.cache_dir)
     if args.clear_cache:
         cache.clear()
         logger.info("Caché eliminada exitosamente.")
         sys.exit(0)
 
-    # --- Acciones simples ---
     if args.install_deps:
         install_dependencies()
         sys.exit(0)
@@ -276,7 +266,6 @@ def main():
         verify_metadata_flow(args.doi, scopus_key, pubmed_key, contact_email, verbose=args.verbose, verify_ssl=args.verify_ssl)
         sys.exit(0)
 
-    # --- Integración con R ---
     rscript_path = find_rscript_path()
 
     if args.check_r:
@@ -298,111 +287,103 @@ def main():
         run_r_native_analysis(rscript_path, args.input, args.output_html, args.output_md)
         sys.exit(0)
 
-    # --- Ejecución del Pipeline Automatizado ---
     if args.pipeline:
-        if not args.search_query:
-            logger.error("Error: Se requiere `--search-query` para ejecutar el pipeline automatizado.")
-            sys.exit(1)
-            
-        logger.info("\n" + "=" * 60)
-        logger.info(f"   INICIANDO INVESTIGACIÓN AUTOMATIZADA DESDE CERO")
-        logger.info(f"   Tema: '{args.search_query}' (Tema: {args.theme})")
-        logger.info("=" * 60 + "\n")
+        seed_doi = None
+        seed_title = "Candidato Semilla"
         
-        # Etapa 1: Buscar artículo semilla
-        logger.info("[Etapa 1/5] Buscando artículo semilla en OpenAlex y PubMed...")
-        
-        # Refinar la query de PubMed si hay límites de años para enfocar la búsqueda inicial
-        pubmed_query = args.search_query
-        if args.start_year and args.end_year:
-            pubmed_query = f"{args.search_query} AND ({args.start_year}:{args.end_year}[DP])"
-            logger.info(f"   [PubMed] Query refinada con fecha: '{pubmed_query}'")
-            
-        openalex_results = search_openalex_works(args.search_query, contact_email, verify_ssl=args.verify_ssl, count=30) or []
-        pubmed_results = search_pubmed_works(pubmed_query, pubmed_key, count=30, verify_ssl=args.verify_ssl) or []
-        
-        # Combinar resultados intercalando
-        results = []
-        max_len = max(len(openalex_results), len(pubmed_results))
-        for i in range(max_len):
-            if i < len(openalex_results):
-                results.append(openalex_results[i])
-            if i < len(pubmed_results):
-                results.append(pubmed_results[i])
+        if args.seed_mode == "doi":
+            if not args.doi:
+                logger.error("Error: En '--seed-mode doi' se requiere especificar '--doi'.")
+                sys.exit(1)
+            seed_doi = args.doi.replace("https://doi.org/", "").strip()
+            logger.info(f"[Etapa 1/5] Usando DOI semilla aportado por el usuario: {seed_doi}")
+        else:
+            if not args.search_query:
+                logger.error("Error: En '--seed-mode search' se requiere especificar '--search-query'.")
+                sys.exit(1)
                 
-        if not results:
-            logger.error("No se encontraron artículos semilla para el tema ingresado.")
-            sys.exit(1)
+            logger.info("\n" + "=" * 60)
+            logger.info(f"   INICIANDO INVESTIGACIÓN AUTOMATIZADA DESDE CERO")
+            logger.info(f"   Tema: '{args.search_query}' (Tema: {args.theme})")
+            logger.info("=" * 60 + "\n")
             
-        # Filtrar candidatos que cumplan con el año y criterios
-        valid_candidates = []
-        for r in results:
-            r_doi = (r.get("doi") or "").replace("https://doi.org/", "").strip()
-            r_title = r.get("title", "")
-            r_year = r.get("year") or r.get("publication_year")
-            r_abstract = r.get("abstract", "")
-            if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter):
-                valid_candidates.append(r)
+            logger.info("[Etapa 1/5] Buscando artículo semilla en OpenAlex y PubMed...")
+            
+            pubmed_query = args.search_query
+            if args.start_year and args.end_year:
+                pubmed_query = f"{args.search_query} AND ({args.start_year}:{args.end_year}[DP])"
+                logger.info(f"   [PubMed] Query refinada con fecha: '{pubmed_query}'")
                 
-        if not valid_candidates:
-            logger.info("   [!] Ningún resultado directo cumple estrictamente los criterios. Reintentando con términos simplificados...")
-            simple_query = args.search_query.replace(" AND ", " ").replace(" OR ", " ").replace("(", "").replace(")", "").replace('"', "").strip()
-            openalex_results_s = search_openalex_works(simple_query, contact_email, verify_ssl=args.verify_ssl, count=30) or []
-            pubmed_results_s = search_pubmed_works(simple_query, pubmed_key, count=30, verify_ssl=args.verify_ssl) or []
-            results_s = []
-            max_len_s = max(len(openalex_results_s), len(pubmed_results_s))
-            for i in range(max_len_s):
-                if i < len(openalex_results_s):
-                    results_s.append(openalex_results_s[i])
-                if i < len(pubmed_results_s):
-                    results_s.append(pubmed_results_s[i])
-            for r in results_s:
-                r_doi = (r.get("doi") or "").replace("https://doi.org/", "").strip()
+            openalex_results = search_openalex_works(args.search_query, contact_email, verify_ssl=args.verify_ssl, count=30) or []
+            pubmed_results = search_pubmed_works(pubmed_query, pubmed_key, count=30, verify_ssl=args.verify_ssl) or []
+            
+            results = []
+            max_len = max(len(openalex_results), len(pubmed_results))
+            for i in range(max_len):
+                if i < len(openalex_results):
+                    results.append(openalex_results[i])
+                if i < len(pubmed_results):
+                    results.append(pubmed_results[i])
+                    
+            if not results:
+                logger.error("No se encontraron artículos semilla para el tema ingresado.")
+                sys.exit(1)
+                
+            valid_candidates = []
+            for r in results:
                 r_title = r.get("title", "")
                 r_year = r.get("year") or r.get("publication_year")
                 r_abstract = r.get("abstract", "")
                 if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter):
                     valid_candidates.append(r)
+                    
+            if not valid_candidates:
+                logger.info("   [!] Ningún resultado directo cumple los criterios. Simplificando términos...")
+                simple_query = args.search_query.replace(" AND ", " ").replace(" OR ", " ").replace("(", "").replace(")", "").replace('"', "").strip()
+                openalex_results_s = search_openalex_works(simple_query, contact_email, verify_ssl=args.verify_ssl, count=30) or []
+                pubmed_results_s = search_pubmed_works(simple_query, pubmed_key, count=30, verify_ssl=args.verify_ssl) or []
+                results_s = []
+                max_len_s = max(len(openalex_results_s), len(pubmed_results_s))
+                for i in range(max_len_s):
+                    if i < len(openalex_results_s):
+                        results_s.append(openalex_results_s[i])
+                    if i < len(pubmed_results_s):
+                        results_s.append(pubmed_results_s[i])
+                for r in results_s:
+                    r_title = r.get("title", "")
+                    r_year = r.get("year") or r.get("publication_year")
+                    r_abstract = r.get("abstract", "")
+                    if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter):
+                        valid_candidates.append(r)
 
-        if valid_candidates:
-            logger.info(f"   [+] Encontrados {len(valid_candidates)} candidatos semilla que cumplen TODOS los criterios dinámicos.")
-            seed_work = valid_candidates[0]
-        else:
-            logger.warning("   [!] Ningún resultado de búsqueda (incluso simplificado) cumple estrictamente los criterios (año + precursor).")
-            logger.warning("   [!] Intentando buscar candidato que cumpla al menos el criterio de año...")
-            # Relajar el filtro de precursor, pero mantener el año
-            for r in results:
-                r_title = r.get("title", "")
-                r_year = r.get("year") or r.get("publication_year")
-                r_abstract = r.get("abstract", "")
-                if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=False):
-                    valid_candidates.append(r)
             if valid_candidates:
-                logger.info(f"   [+] Candidato semilla seleccionado por año: {valid_candidates[0].get('title')}")
+                logger.info(f"   [+] Encontrados {len(valid_candidates)} candidatos semilla válidos.")
                 seed_work = valid_candidates[0]
             else:
-                logger.warning("   [!] Ningún candidato cumple el rango de años en los resultados de búsqueda.")
-                logger.warning("   [!] Seleccionando el artículo de mayor relevancia original como fallback...")
-                seed_work = None
+                logger.warning("   [!] Ningún candidato cumple los criterios estrictos de precursor. Relajando filtros...")
                 for r in results:
-                    if r.get("doi") and "pmid:" not in r.get("doi"):
-                        seed_work = r
-                        break
-                if not seed_work:
+                    r_title = r.get("title", "")
+                    r_year = r.get("year") or r.get("publication_year")
+                    r_abstract = r.get("abstract", "")
+                    if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=False):
+                        valid_candidates.append(r)
+                if valid_candidates:
+                    seed_work = valid_candidates[0]
+                else:
+                    seed_work = None
                     for r in results:
-                        if r.get("doi"):
+                        if r.get("doi") and "pmid:" not in r.get("doi"):
                             seed_work = r
                             break
-                if not seed_work:
-                    seed_work = results[0]
-            
-        seed_doi = (seed_work.get("doi") or "").replace("https://doi.org/", "")
-        seed_title = seed_work.get("title", "Sin título")
-        logger.info(f"   [+] Artículo semilla seleccionado:")
-        logger.info(f"       Título: {seed_title}")
-        logger.info(f"       DOI: {seed_doi}")
+                    if not seed_work:
+                        seed_work = results[0]
+                
+            seed_doi = (seed_work.get("doi") or "").replace("https://doi.org/", "")
+            seed_title = seed_work.get("title", "Sin título")
+            logger.info(f"   [+] Artículo semilla seleccionado:")
+            logger.info(f"       Título: {seed_title}")
+            logger.info(f"       DOI: {seed_doi}")
         
-        # Resolver rutas de salida si se especifica output_dir
         pdf_dir = args.pdf_dir
         if args.output_dir:
             os.makedirs(args.output_dir, exist_ok=True)
@@ -422,7 +403,6 @@ def main():
             r_biblio_md = "base_bibliometria.md"
             r_report_html = "reporte_editorial.html"
             
-        # Etapa 2: Linaje y construcción de red
         logger.info("\n[Etapa 2/5] Ejecutando análisis de linaje científico en vivo...")
         max_refs = args.max_refs if args.max_refs > 0 else None
         
@@ -448,17 +428,15 @@ def main():
             precursor_filter=args.precursor_filter
         )
         
-        # Etapa 3: Generar y poblar matriz Excel
-        logger.info("\n[Etapa 3/5] Generando y poblando matriz de síntesis de Excel...")
+        logger.info("\n[Etapa 3/5] Generando y poblando matriz de síntesis Excel...")
         generate_populated_matrix(nodes, matrix_path, args.theme)
         
-        # Etapa 4 & 5: R-Bibliometrix
         if rscript_path:
             logger.info("\n[Etapa 4/5] Ejecutando análisis R-Bibliometrix nativo...")
             ensure_r_packages(rscript_path)
             run_r_native_analysis(rscript_path, matrix_path, r_cooccur_html, r_biblio_md)
             
-            logger.info("\n[Etapa 5/5] Compilando reporte R Markdown de calidad editorial...")
+            logger.info("\n[Etapa 5/5] Compilando reporte R Markdown...")
             run_r_report(rscript_path, matrix_path, r_report_html)
             
             logger.info("\n" + "=" * 60)
@@ -468,8 +446,6 @@ def main():
             logger.info(f"   - Matriz Poblada Excel: {matrix_path}")
             logger.info(f"   - Red de Co-ocurrencias R: {r_cooccur_html}")
             logger.info(f"   - Reporte Editorial R Markdown: {r_report_html}")
-            fig_loc = os.path.join(args.output_dir, "figuras") if args.output_dir else "figuras"
-            logger.info(f"   - Figuras HD guardadas en la carpeta: {fig_loc}/")
             logger.info("=" * 60 + "\n")
         else:
             logger.warning("\n[Advertencia] Rscript no encontrado en el sistema. Se omiten etapas de R.")
@@ -482,13 +458,12 @@ def main():
             
         sys.exit(0)
 
-    # --- Motor de Linaje ---
     if args.linaje:
         if not args.doi:
             logger.error("Error: Se requiere `--doi` para el motor de linaje.")
             sys.exit(1)
 
-        max_refs = args.max_refs if args.max_refs > 0 else None  # 0 = sin límite
+        max_refs = args.max_refs if args.max_refs > 0 else None
 
         execute_live_lineage(
             doi=args.doi,
