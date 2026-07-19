@@ -14,7 +14,8 @@ dependencies = [
     "openpyxl",
     "networkx",
     "pypdf",
-    "python-dotenv"
+    "python-dotenv",
+    "requests"
 ]
 
 [project.scripts]

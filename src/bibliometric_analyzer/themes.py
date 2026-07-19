@@ -75,6 +75,17 @@ def _extract_key_terms(title, abstract, n=5):
     return [t[0] for t in sorted_terms[:n]]
 
 
+def _truncate_words(text, max_chars=120):
+    """Trunca en límite de palabra, no de carácter. Evita cortes como '...the find.' en vez de '...the findings'."""
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    last_space = cut.rfind(' ')
+    if last_space > max_chars // 2:
+        cut = cut[:last_space]
+    return cut.rstrip('.,;')
+
+
 def _generic_qualitative(title, abstract, discipline_hint=""):
     """Genera descubrimientos y aportes genéricos desde título + abstract."""
     terms = _extract_key_terms(title, abstract)
@@ -88,20 +99,21 @@ def _generic_qualitative(title, abstract, discipline_hint=""):
     # Intentar extraer hallazgos del abstract
     abstract_lower = abstract.lower()
     
-    # Buscar patrones de resultados
+    # Buscar patrones de resultados — captura hasta fin de oración o 150 chars, luego trunca en palabra
     result_patterns = [
-        r'(?:results?\s+(?:show|indicate|demonstrate|reveal|suggest|confirm))\s+(.{30,120})',
-        r'(?:findings?\s+(?:show|indicate|demonstrate|reveal|suggest))\s+(.{30,120})',
-        r'(?:we\s+(?:found|observed|demonstrated|showed))\s+(.{30,120})',
-        r'(?:se\s+(?:encontró|observó|demostró|evidenció))\s+(.{30,120})',
-        r'(?:los\s+resultados\s+(?:muestran|indican|demuestran|revelan))\s+(.{30,120})',
+        r'(?:results?\s+(?:show|indicate|demonstrate|reveal|suggest|confirm))\s+([^.]{30,150})',
+        r'(?:findings?\s+(?:show|indicate|demonstrate|reveal|suggest))\s+([^.]{30,150})',
+        r'(?:we\s+(?:found|observed|demonstrated|showed))\s+([^.]{30,150})',
+        r'(?:se\s+(?:encontró|observó|demostró|evidenció))\s+([^.]{30,150})',
+        r'(?:los\s+resultados\s+(?:muestran|indican|demuestran|revelan))\s+([^.]{30,150})',
     ]
     
     finding = None
     for pattern in result_patterns:
         match = re.search(pattern, abstract_lower)
         if match:
-            finding = match.group(1).strip().rstrip('.')
+            # Truncar en límite de palabra, no de carácter
+            finding = _truncate_words(match.group(1).strip().rstrip('.'), max_chars=120)
             break
     
     if finding:

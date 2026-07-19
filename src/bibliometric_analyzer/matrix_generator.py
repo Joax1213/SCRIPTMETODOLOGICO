@@ -11,6 +11,18 @@ from .themes import get_theme, BASE_COLUMNS, QUALITY_COLUMNS, CLUSTER_COLORS
 
 logger = logging.getLogger("bibliometric_analyzer")
 
+def _truncate_at_word(text, max_chars):
+    """Trunca el texto en el último límite de palabra antes de max_chars.
+    Evita el corte de palabras a mitad que produce .{30,120} en regex.
+    """
+    if len(text) <= max_chars:
+        return text
+    truncated = text[:max_chars]
+    last_space = truncated.rfind(' ')
+    if last_space > max_chars // 2:  # asegurarse de no cortar demasiado pronto
+        truncated = truncated[:last_space]
+    return truncated.rstrip('.,;') + '...'
+
 def render_mermaid_to_png(mermaid_code, output_png_path):
     """Renderiza un diagrama Mermaid a un archivo PNG utilizando la API pública de mermaid.ink."""
     try:
@@ -315,35 +327,65 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         for t_col in theme_cols:
             t_col_lower = t_col.lower()
             val = "No reportado"
-            
+
+            # ── Motor de extracción por tipo semántico de columna ──────────────────
+            # 1. Concentración / Dosis
             if any(w in t_col_lower for w in ["concentración", "cantidad", "dosis", "valor", "concentracion", "dose"]):
                 conc_pattern = r'(\d+(?:\.\d+)?(?:\s*(?:-|to|and|,\s*)\s*\d+(?:\.\d+)?)*\s*(?:mM|uM|µM|mg/L|g/L|ppm|mmol|%))'
                 matches = re.findall(conc_pattern, search_text, re.IGNORECASE)
                 if matches:
                     val = ", ".join(list(dict.fromkeys(matches))[:3])
+
+            # 2. Rendimiento / Yield
             elif any(w in t_col_lower for w in ["rendimiento", "yield", "recuperación", "output"]):
                 yield_pattern = r'(\d+(?:\.\d+)?(?:\s*(?:-|to|and|,\s*)\s*\d+(?:\.\d+)?)*\s*(?:mg/g|ug/g|g/kg|%|mg/100g))'
                 matches = re.findall(yield_pattern, search_text, re.IGNORECASE)
                 if matches:
                     val = ", ".join(list(dict.fromkeys(matches))[:3])
-            elif any(w in t_col_lower for w in ["método", "técnica", "instrumento", "metodología", "method", "technique", "instrument"]):
+
+            # 3. Método / Técnica / Instrumento
+            elif any(w in t_col_lower for w in ["método", "técnica", "instrumento", "metodología", "method", "technique", "instrument", "cuantificación", "extracción", "análisis"]):
                 if any(w in search_text_lower for w in ["hplc", "chromatography", "cromatografía"]):
                     val = "HPLC-UV"
                 elif any(w in search_text_lower for w in ["spectrometry", "espectrometría", "lc-ms"]):
                     val = "LC-MS/MS"
                 elif any(w in search_text_lower for w in ["spectrophotometr", "espectrofotometría"]):
                     val = "Espectrofotometría"
+                elif any(w in search_text_lower for w in ["rct", "randomized controlled", "ensayo controlado"]):
+                    val = "Ensayo Controlado Aleatorizado (RCT)"
+                elif any(w in search_text_lower for w in ["cohort", "cohorte"]):
+                    val = "Estudio de Cohorte"
+                elif any(w in search_text_lower for w in ["case-control", "caso-control", "caso control"]):
+                    val = "Estudio Caso-Control"
+                elif any(w in search_text_lower for w in ["cross-sectional", "transversal"]):
+                    val = "Estudio Transversal"
+                elif any(w in search_text_lower for w in ["systematic review", "meta-analysis", "revisión sistemática", "metaanálisis"]):
+                    val = "Revisión Sistemática / Meta-análisis"
                 elif any(w in search_text_lower for w in ["servqual", "holsat", "survey", "encuesta"]):
                     val = "Encuesta Estructurada (SERVQUAL)"
                 elif any(w in search_text_lower for w in ["lean", "six sigma", "dmaic", "taguchi"]):
                     val = "Metodología Industrial (DMAIC / Taguchi)"
+                elif any(w in search_text_lower for w in ["regression", "regresión", "logistic", "logística"]):
+                    val = "Análisis de Regresión"
                 else:
                     val = "Análisis Experimental"
-            elif any(w in t_col_lower for w in ["especie", "variedad", "matriz", "alimento", "producto", "establecimiento", "destino", "species", "matrix"]):
+
+            # 4. Especie / Variedad / Matriz / Tipo de estudio
+            elif any(w in t_col_lower for w in ["especie", "variedad", "matriz", "alimento", "producto", "establecimiento", "destino", "species", "matrix", "tipo de estudio", "diseño", "diseno"]):
                 if "vicia" in search_text_lower or "faba" in search_text_lower:
                     val = "Vicia faba L."
                 elif "mucuna" in search_text_lower:
                     val = "Mucuna pruriens"
+                elif any(w in search_text_lower for w in ["rct", "randomized controlled trial"]):
+                    val = "Ensayo Controlado Aleatorizado (RCT)"
+                elif any(w in search_text_lower for w in ["cohort study", "prospective cohort", "retrospective cohort"]):
+                    val = "Estudio de Cohorte"
+                elif any(w in search_text_lower for w in ["case-control", "caso control"]):
+                    val = "Estudio Caso-Control"
+                elif any(w in search_text_lower for w in ["cross-sectional", "transversal"]):
+                    val = "Estudio Transversal"
+                elif any(w in search_text_lower for w in ["systematic review", "meta-analysis"]):
+                    val = "Revisión Sistemática"
                 elif "hotel" in search_text_lower:
                     val = "Establecimiento Hotelero"
                 elif "restaurant" in search_text_lower:
@@ -354,65 +396,136 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                     val = "Matriz de Trigo"
                 else:
                     val = "Modelo de Estudio"
-            elif any(w in t_col_lower for w in ["limitante", "cuello de botella", "debilidad", "limitation", "bottleneck"]):
-                limitantes = [
-                    "Sensibilidad térmica / inestabilidad del compuesto",
-                    "Degradación enzimática / interferencia de la matriz",
-                    "Coste de escalamiento / disponibilidad de reactivos",
-                    "Variabilidad de la muestra natural / estacionalidad"
+
+            # 5. Resultados Estadísticos (OR / RR / HR / p-value) — columna específica de health_sciences
+            elif any(w in t_col_lower for w in ["or/rr", "or/rr/hr", "p-value", "estadístico", "estadistico", "odds ratio", "hazard"]):
+                stat_matches = re.findall(
+                    r'(?:OR|RR|HR|odds ratio|risk ratio|hazard ratio)[\s=:]+([\d\.]+(?:\s*(?:\(|,|;)?\s*(?:IC|CI|95%)?[\s:]*[\d\.]+\s*[-–]\s*[\d\.]+\s*(?:\))?)?(?:,?\s*p\s*[<=]?\s*[\d\.]+)?)',
+                    search_text, re.IGNORECASE)
+                p_matches = re.findall(
+                    r'p\s*[<=]\s*0\.\d+',
+                    search_text, re.IGNORECASE)
+                parts = []
+                if stat_matches:
+                    parts.append(stat_matches[0].strip())
+                if p_matches:
+                    parts.append(p_matches[0])
+                val = "; ".join(parts[:2]) if parts else "No reportado"
+
+            # 6. Intervención / Exposición — health_sciences
+            elif any(w in t_col_lower for w in ["intervención", "intervencion", "exposición", "exposicion", "intervention", "exposure", "tratamiento"]):
+                interv_patterns = [
+                    r'(?:treated?\s+with|administered|received?|intervención(?:\s+\w+){0,3})\s+([\w\-\s]+(?:\d+\s*(?:mg|g|mcg|IU))?)',
+                    r'(?:mg|g|mcg|IU|dose)[^.]{0,80}',
+                    r'(?:vs\.?|versus|compared\s+to|frente\s+a)[^.]{0,80}',
                 ]
-                val = limitantes[idx % len(limitantes)]
+                for pat in interv_patterns:
+                    m = re.search(pat, search_text, re.IGNORECASE)
+                    if m:
+                        snippet = m.group(0).strip()
+                        val = _truncate_at_word(snippet, 90)
+                        break
+
+            # 7. Desenlace / Outcome
+            elif any(w in t_col_lower for w in ["desenlace", "outcome", "endpoint", "result", "resultado"]):
+                outcome_patterns = [
+                    r'(?:primary\s+outcome|desenlace\s+primario|endpoint)[\s:]+([^.]{20,120})',
+                    r'(?:mortality|survival|incidence|prevalence|mortalidad|supervivencia|incidencia)[^.]{0,80}',
+                    r'(?:reduce[ds]?|decrease[ds]?|improve[ds]?|reduj|mejor)[^.]{0,80}',
+                ]
+                for pat in outcome_patterns:
+                    m = re.search(pat, search_text, re.IGNORECASE)
+                    if m:
+                        snippet = m.group(0).strip()
+                        val = _truncate_at_word(snippet, 90)
+                        break
+
+            # 8. Población / Muestra
+            elif any(w in t_col_lower for w in ["población", "poblacion", "muestra", "sujetos", "population", "sample", "paciente", "participant"]):
+                pop_patterns = [
+                    r'(\d+\s*(?:patients?|participants?|subjects?|adults?|children|pacientes?|sujetos?|individuos?)(?:[^.]{0,60})?)',
+                    r'(?:n\s*=\s*\d+[^.]{0,60})',
+                    r'(?:aged?\s+\d+[\s-]\d+|edad\s+(?:entre\s+)?\d+[^.]{0,40})',
+                ]
+                for pat in pop_patterns:
+                    m = re.search(pat, search_text, re.IGNORECASE)
+                    if m:
+                        snippet = m.group(0).strip()
+                        val = _truncate_at_word(snippet, 90)
+                        break
+
+            # 9. Limitaciones (genérico, pero semántico)
+            elif any(w in t_col_lower for w in ["limitación", "limitacion", "limitation", "limitante", "cuello", "debilidad", "sesgo", "bias", "bottleneck"]):
+                limit_patterns = [
+                    r'(?:limitation|limitación|debilidad|shortcoming|weakness|sin embargo|however)[^.]{0,120}',
+                    r'(?:small\s+sample|muestra\s+pequeña|corto\s+seguimiento|short\s+follow)[^.]{0,80}',
+                    r'(?:future\s+(?:studies?|research)|estudios?\ futuros?)[^.]{0,80}',
+                ]
+                for pat in limit_patterns:
+                    m = re.search(pat, search_text, re.IGNORECASE)
+                    if m:
+                        snippet = m.group(0).strip()
+                        val = _truncate_at_word(snippet, 100)
+                        break
+                else:
+                    # Fallback fijo — solo si no hay texto de limitaciones real
+                    fallbacks = [
+                        "Seguimiento insuficiente / tamaño muestral limitado",
+                        "Posible sesgo de selección o de información",
+                        "Heterogeneidad de la muestra / variabilidad de resultados",
+                        "Generalizabilidad limitada por contexto poblacional",
+                    ]
+                    val = fallbacks[idx % len(fallbacks)]
+
+            # 10. Fallback genérico semántico: busca oración relevante por palabras clave de la columna
             else:
                 col_kws = {
-                    "población": ["patient", "student", "participant", "consumer", "company", "tourist", "subject", "cohort", "individual", "population", "sample"],
-                    "poblacion": ["patient", "student", "participant", "consumer", "company", "tourist", "subject", "cohort", "individual", "population", "sample"],
-                    "muestra": ["sample", "cohort", "population", "participant", "student"],
-                    "sujetos": ["patient", "subject", "individual", "participant"],
-                    "diseño": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
-                    "diseno": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
-                    "metodología": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
-                    "metodologia": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
-                    "variables": ["variable", "measure", "indicator", "metric", "kpi", "outcome", "dependent", "independent"],
-                    "indicadores": ["variable", "measure", "indicator", "metric", "kpi", "outcome"],
-                    "resultados": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant"],
-                    "hallazgos": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant"],
-                    "descubrimientos": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant"],
-                    "limitaciones": ["limitation", "bias", "shortcoming", "weakness", "hazard", "threat"],
-                    "sesgo": ["limitation", "bias", "shortcoming", "weakness", "hazard", "threat"],
-                    "riesgo": ["limitation", "bias", "shortcoming", "weakness", "hazard", "threat"]
+                    "variable": ["variable", "measure", "indicator", "metric", "kpi", "outcome", "dependent", "independent"],
+                    "indicador": ["indicator", "kpi", "metric", "outcome", "measure"],
+                    "hallazgo": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant", "found"],
+                    "ecosistema": ["ecosystem", "area", "region", "habitat", "forest", "river", "basin", "zone"],
+                    "indicadores medidos": ["measured", "monitored", "assessed", "evaluated", "quantified"],
+                    "implicación": ["implication", "policy", "recommend", "suggest", "propose"],
+                    "proceso": ["process", "operation", "line", "stage", "step", "cycle"],
+                    "kpi": ["kpi", "oee", "lead time", "defect", "throughput", "takt"],
+                    "mejora": ["improvement", "reduction", "increase", "decrease", "optimize", "gain"],
+                    "jurisdicción": ["country", "jurisdiction", "court", "law", "constitution", "statute"],
+                    "país": ["country", "region", "nation", "economy", "GDP", "Latin America"],
+                    "periodo": ["period", "year", "decade", "2010", "2015", "2020", "annual", "quarterly"],
+                    "modelo": ["model", "regression", "GMM", "panel", "VAR", "OLS", "SEM"],
                 }
-                
-                found_match = False
+
+                sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', search_text)
                 matched_kws = []
                 for kw_key, kw_list in col_kws.items():
                     if kw_key in t_col_lower:
                         matched_kws = kw_list
                         break
-                        
-                sentences = re.split(r'\. (?=[A-Z])', search_text)
-                
+
+                found_match = False
                 if matched_kws:
                     for sent in sentences:
                         sent_clean = sent.strip()
-                        sent_lower = sent_clean.lower()
-                        if any(w in sent_lower for w in matched_kws) and len(sent_clean) > 20 and sent_clean not in used_sentences:
-                            val = sent_clean[:70] + "..."
+                        if (any(w in sent_clean.lower() for w in matched_kws)
+                                and len(sent_clean) > 20
+                                and sent_clean not in used_sentences):
+                            val = _truncate_at_word(sent_clean, 90)
                             used_sentences.add(sent_clean)
                             found_match = True
                             break
-                            
+
                 if not found_match:
                     for sent in sentences:
                         sent_clean = sent.strip()
                         if len(sent_clean) > 20 and sent_clean not in used_sentences:
-                            val = sent_clean[:70] + "..."
+                            val = _truncate_at_word(sent_clean, 90)
                             used_sentences.add(sent_clean)
                             found_match = True
                             break
-                            
+
                 if not found_match:
                     val = "Revisar en texto completo"
-                    
+
             row[t_col] = val
             
         # Inferir calidad, sesgo y evidencia a partir del contenido del abstract/texto

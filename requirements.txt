@@ -3,3 +3,4 @@ openpyxl
 networkx
 pypdf
 python-dotenv
+requests
