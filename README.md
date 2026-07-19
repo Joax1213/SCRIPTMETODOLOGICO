@@ -1,50 +1,19 @@
-# SCRIPTMETODOLOGICO
+# Bibliometric Analyzer
 
-**Automated Citation Lineage & Bibliometrics Pipeline** — A Python CLI tool for automated bibliometric analysis, citation lineage mapping, and systematic review assistance.
+**Science Lineage & Bibliometrics CLI** — A Python tool for automated bibliometric analysis, citation lineage mapping, and systematic review assistance.
 
-[![CI](https://github.com/Joax1213/SCRIPTMETODOLOGICO/actions/workflows/ci.yml/badge.svg)](https://github.com/Joax1213/SCRIPTMETODOLOGICO/actions/workflows/ci.yml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21410712.svg)](https://doi.org/10.5281/zenodo.21410712)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-
----
-
-> [!IMPORTANT]
-> ## 📖 Citation Required
->
-> **Use of this software in any form (academic publications, reports, theses, presentations, or derived tools) requires mandatory citation.**
->
-> GitHub automatically generates the citation from the [`CITATION.cff`](CITATION.cff) file — click the **"Cite this repository"** button on the repository sidebar.
->
-> **APA 7:**
-> ```
-> Aranibar Torres, J. G. (2026). SCRIPTMETODOLOGICO: Automated Citation Lineage & Bibliometrics Pipeline (v1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.21410712
-> ```
->
-> **BibTeX:**
-> ```bibtex
-> @software{aranibar_2026_scriptmetodologico,
->   author    = {Aranibar Torres, Joaquin Gabriel},
->   title     = {{SCRIPTMETODOLOGICO: Automated Citation Lineage \& Bibliometrics Pipeline}},
->   version   = {1.0.0},
->   year      = {2026},
->   doi       = {10.5281/zenodo.21410712},
->   url       = {https://doi.org/10.5281/zenodo.21410712},
->   note      = {ORCID: 0009-0000-6869-3489}
-> }
-> ```
->
-> Failure to cite this software constitutes a violation of the [MIT License](LICENSE) attribution clause.
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
 ## Overview
 
-`SCRIPTMETODOLOGICO` is a command-line tool designed for researchers and academics that integrates multiple scientific database APIs to:
+`bibliometric-analyzer` is a command-line tool designed for researchers and academics that integrates multiple scientific database APIs to:
 
 - **Map citation lineage** (ancestors and descendants) for any DOI using OpenAlex, Scopus, and PubMed.
 - **Generate interactive network visualizations** (Vis.js dual-tab: citation network + concept co-occurrence network).
-- **Execute bibliometric batch analysis** via R's `bibliometrix` package and Biblioshiny.
+- **Execute bibliometric batch analysis** via R's `bibliometrix` package and Biblioshiny (no PyBibX dependency).
 - **Compile structured systematic review matrices** with GRADE/Cochrane quality rubrics.
 - **Generate PRISMA flow diagrams** for systematic reviews.
 
@@ -183,7 +152,7 @@ src/bibliometric_analyzer/
 ├── scopus_client.py    # Elsevier Scopus API client (optional)
 ├── openalex_client.py  # OpenAlex API client (free, no key)
 ├── pubmed_client.py    # NCBI PubMed Entrez API client (optional key)
-├── lineage_engine.py   # Citation graph construction, PageRank, qualitative analysis
+├── lineage_engine.py   # Citation graph construction, PageRank, qualitative analysis (max_total_nodes protection)
 ├── visualizer.py       # Interactive Vis.js HTML network generator
 ├── r_bridge.py         # R / bibliometrix / R Markdown integration
 └── matrix_generator.py # Excel template and PRISMA flow generator
@@ -203,7 +172,7 @@ python -m unittest discover -s tests
 
 1. **Lineage depth:** By default (`--depth 1`), only first-degree ancestors and descendants are retrieved. Multi-hop recursion is supported via `--depth N` but exponentially increases API calls.
 2. **Ancestor coverage:** `--max-refs` controls the maximum number of references analyzed per node. Set `--max-refs 0` to disable the limit (use with caution on papers with 100+ references).
-3. **Scopus forward citations:** Uses `REFDOI` operator for precision. Falls back to `REFTITLE` only when no DOI is available.
+3. **Scopus forward citations:** Uses `REFDOI` operator for precision. Falls back to `REFTITLE` only when no DOI is available — documented as a known limitation.
 4. **Abstract availability:** OpenAlex abstract inverted index covers approximately 60% of papers. For the remainder, abstract will show "Abstract no disponible."
 
 ---
@@ -216,11 +185,11 @@ Academic researchers performing systematic literature reviews often struggle to 
 - **VOSviewer**: A powerful desktop application for visualizing bibliometric networks. However, it is a GUI-only Java desktop app, making it impossible to integrate into automated command-line scripts or headless Python data pipelines.
 - **litstudy**: A Python package for literature analysis, but it does not implement automated BFS/recursive citation lineage tracking (ancestor/descendant discovery) from a seed DOI, nor does it generate standalone interactive dual-network HTML reports.
 
-`SCRIPTMETODOLOGICO` bridges these gaps by providing a CLI-first, fully automated citation lineage engine. Starting from a single query or DOI, it crawls database APIs in a cascade, populates a systematic review matrix, runs R's `bibliometrix` under the hood, and produces clean HTML reports with interactive visualizations.
+`bibliometric-analyzer` bridges these gaps by providing a CLI-first, fully automated citation lineage engine. Starting from a single query or DOI, it crawls database APIs in a cascade, populates a systematic review matrix, runs R's `bibliometrix` under the hood, and produces clean HTML reports with interactive visualizations.
 
 ### Feature Comparison
 
-| Feature | `bibliometrix` (R) | `VOSviewer` | `litstudy` (Python) | `SCRIPTMETODOLOGICO` (Ours) |
+| Feature | `bibliometrix` (R) | `VOSviewer` | `litstudy` (Python) | `bibliometric-analyzer` (Ours) |
 |---|:---:|:---:|:---:|:---:|
 | **Automated Seed Lineage Tracking** | ❌ No | ❌ No | ❌ No | **Yes (Scopus/OpenAlex/PubMed)** |
 | **Interactive Standalone HTML Output** | ❌ No (requires Shiny) | ❌ No | ❌ No | **Yes (Vis.js dual-tab)** |
@@ -233,11 +202,3 @@ Academic researchers performing systematic literature reviews often struggle to 
 ## License
 
 MIT License — see [LICENSE](LICENSE).
-
-**By downloading, cloning, forking, or using this software in any capacity, you agree to cite the original author as described in the [Citation Required](#-citation-required) section above.** This obligation is a condition of the MIT License's attribution requirement.
-
----
-
-## Author
-
-**Joaquin Gabriel Aranibar Torres** — [ORCID: 0009-0000-6869-3489](https://orcid.org/0009-0000-6869-3489)
