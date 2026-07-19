@@ -74,8 +74,9 @@ def ensure_r_packages(rscript_path):
     """
     
     fd, temp_path = tempfile.mkstemp(suffix=".R")
+    os.close(fd)
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with open(temp_path, 'w', encoding='utf-8') as f:
             f.write(check_code)
             
         try:
@@ -119,8 +120,9 @@ def run_biblioshiny(rscript_path):
     logger.info("  - Presiona Ctrl+C en esta terminal para finalizar el servidor.")
     import tempfile
     fd, temp_path = tempfile.mkstemp(suffix=".R")
+    os.close(fd)
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with open(temp_path, 'w', encoding='utf-8') as f:
             f.write("bibliometrix::biblioshiny()")
         subprocess.run([rscript_path, temp_path])
     except KeyboardInterrupt:
@@ -794,12 +796,13 @@ tryCatch({
     logger.info(f"\n[R-Bibliometrix] Intentando compilar reporte cienciométrico oficial R Markdown para '{input_file}'...")
     import tempfile
     fd, temp_path = tempfile.mkstemp(suffix=".R")
+    os.close(fd)
     success = False
     try:
         with open(temp_rmd_path, "w", encoding="utf-8") as f_rmd:
             f_rmd.write(rmd_template)
             
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with open(temp_path, 'w', encoding='utf-8') as f:
             f.write(r_code)
         subprocess.run([rscript_path, temp_path], check=True)
         logger.info(f"¡Reporte R Markdown guardado con éxito en: {output_html}!")
@@ -832,8 +835,9 @@ tryCatch({
         write.csv(M[, c("UT", "TI", "AU", "PY", "JI", "AB")], file = file.path("{temp_dir_esc_fb}", "r_meta.csv"), row.names=FALSE)
         """
         fd_fb, temp_path_fb = tempfile.mkstemp(suffix=".R")
+        os.close(fd_fb)
         try:
-            with os.fdopen(fd_fb, 'w', encoding='utf-8') as f_fb:
+            with open(temp_path_fb, 'w', encoding='utf-8') as f_fb:
                 f_fb.write(r_code_fallback)
             subprocess.run([rscript_path, temp_path_fb], check=True)
             
@@ -973,8 +977,9 @@ def run_r_native_analysis(rscript_path, input_file, output_html, output_md):
     logger.info(f"\n[R-Bibliometrix] Ejecutando análisis nativo de R para '{input_file}'...")
     import tempfile
     fd, temp_path = tempfile.mkstemp(suffix=".R")
+    os.close(fd)
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with open(temp_path, 'w', encoding='utf-8') as f:
             f.write(r_code)
         subprocess.run([rscript_path, temp_path], check=True)
         logger.info("Datos exportados desde R con éxito.")

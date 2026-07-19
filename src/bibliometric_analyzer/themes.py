@@ -86,9 +86,9 @@ def _truncate_words(text, max_chars=120):
         return text
     cut = text[:max_chars]
     last_space = cut.rfind(' ')
-    if last_space > max_chars // 2:
+    if last_space > 0:
         cut = cut[:last_space]
-    return cut.rstrip('.,;')
+    return cut.rstrip('.,;') + '...'
 
 
 def _generic_qualitative(title, abstract, discipline_hint=""):
@@ -108,11 +108,11 @@ def _generic_qualitative(title, abstract, discipline_hint=""):
     # Usa lookahead negativo (?!\. +[A-Z]) para NO cortar en puntos decimales
     # (p=0.003, OR=2.4, F1=0.89) — solo corta en fin de oración real.
     result_patterns = [
-        r'(?:results?\s+(?:show|indicate|demonstrate|reveal|suggest|confirm))\s+((?:(?!\.\s+[A-Z]).){30,200})',
-        r'(?:findings?\s+(?:show|indicate|demonstrate|reveal|suggest))\s+((?:(?!\.\s+[A-Z]).){30,200})',
-        r'(?:we\s+(?:found|observed|demonstrated|showed))\s+((?:(?!\.\s+[A-Z]).){30,200})',
-        r'(?:se\s+(?:encontró|observó|demostró|evidenció))\s+((?:(?!\.\s+[A-Z]).){30,200})',
-        r'(?:los\s+resultados\s+(?:muestran|indican|demuestran|revelan))\s+((?:(?!\.\s+[A-Z]).){30,200})',
+        r'(?:results?\s+(?:show|indicate|demonstrate|reveal|suggest|confirm))\s+((?:(?!\.\s+[A-Z]).)+)',
+        r'(?:findings?\s+(?:show|indicate|demonstrate|reveal|suggest))\s+((?:(?!\.\s+[A-Z]).)+)',
+        r'(?:we\s+(?:found|observed|demonstrated|showed))\s+((?:(?!\.\s+[A-Z]).)+)',
+        r'(?:se\s+(?:encontró|observó|demostró|evidenció))\s+((?:(?!\.\s+[A-Z]).)+)',
+        r'(?:los\s+resultados\s+(?:muestran|indican|demuestran|revelan))\s+((?:(?!\.\s+[A-Z]).)+)',
     ]
 
     finding = None

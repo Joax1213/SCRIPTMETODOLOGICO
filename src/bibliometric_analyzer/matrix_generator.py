@@ -85,17 +85,78 @@ def run_interactive_prisma_flow(output_path=None):
     print("Por favor, introduce los conteos de registros solicitados:")
     
     try:
-        db_records = int(input("1. Registros identificados en Bases de Datos (Scopus, PubMed, etc.): ") or 0)
-        other_records = int(input("2. Registros identificados en otras fuentes (Manual, etc.): ") or 0)
-        duplicates = int(input("3. Registros duplicados eliminados: ") or 0)
+        # 1. db_records
+        while True:
+            try:
+                db_records = int(input("1. Registros identificados en Bases de Datos (Scopus, PubMed, etc.): ") or 0)
+                if db_records < 0:
+                    print("   [Error] La cantidad de registros no puede ser negativa. Inténtalo de nuevo.")
+                    continue
+                break
+            except ValueError:
+                print("   [Error] Entrada no válida. Introduce un número entero.")
+
+        # 2. other_records
+        while True:
+            try:
+                other_records = int(input("2. Registros identificados en otras fuentes (Manual, etc.): ") or 0)
+                if other_records < 0:
+                    print("   [Error] La cantidad de registros no puede ser negativa. Inténtalo de nuevo.")
+                    continue
+                break
+            except ValueError:
+                print("   [Error] Entrada no válida. Introduce un número entero.")
         
         total_identified = db_records + other_records
+        print(f"   -> Total registros identificados: {total_identified}")
+        
+        # 3. duplicates
+        while True:
+            try:
+                duplicates = int(input("3. Registros duplicados eliminados: ") or 0)
+                if duplicates < 0:
+                    print("   [Error] La cantidad de duplicados no puede ser negativa. Inténtalo de nuevo.")
+                    continue
+                if duplicates > total_identified:
+                    print(f"   [Error] Los duplicados ({duplicates}) no pueden exceder los registros identificados ({total_identified}). Inténtalo de nuevo.")
+                    continue
+                break
+            except ValueError:
+                print("   [Error] Entrada no válida. Introduce un número entero.")
+                
         screened = total_identified - duplicates
+        print(f"   -> Registros cribados (título/abstract): {screened}")
         
-        screened_excluded = int(input("4. Registros excluidos tras cribado de título/abstract: ") or 0)
+        # 4. screened_excluded
+        while True:
+            try:
+                screened_excluded = int(input("4. Registros excluidos tras cribado de título/abstract: ") or 0)
+                if screened_excluded < 0:
+                    print("   [Error] La cantidad de excluidos no puede ser negativa. Inténtalo de nuevo.")
+                    continue
+                if screened_excluded > screened:
+                    print(f"   [Error] Los excluidos en cribado ({screened_excluded}) no pueden exceder los registros cribados ({screened}). Inténtalo de nuevo.")
+                    continue
+                break
+            except ValueError:
+                print("   [Error] Entrada no válida. Introduce un número entero.")
+                
         eligibility = screened - screened_excluded
+        print(f"   -> Artículos evaluados en texto completo: {eligibility}")
         
-        eligibility_excluded = int(input("5. Artículos evaluados en texto completo que fueron EXCLUIDOS: ") or 0)
+        # 5. eligibility_excluded
+        while True:
+            try:
+                eligibility_excluded = int(input("5. Artículos de texto completo EXCLUIDOS: ") or 0)
+                if eligibility_excluded < 0:
+                    print("   [Error] La cantidad de excluidos no puede ser negativa. Inténtalo de nuevo.")
+                    continue
+                if eligibility_excluded > eligibility:
+                    print(f"   [Error] Los artículos excluidos ({eligibility_excluded}) no pueden exceder los artículos evaluados ({eligibility}). Inténtalo de nuevo.")
+                    continue
+                break
+            except ValueError:
+                print("   [Error] Entrada no válida. Introduce un número entero.")
         
         reasons = []
         if eligibility_excluded > 0:
@@ -107,6 +168,7 @@ def run_interactive_prisma_flow(output_path=None):
                 reasons.append(reason)
                 
         included = eligibility - eligibility_excluded
+        print(f"   -> Artículos incluidos finales: {included}")
         
         reasons_str = "; ".join(reasons) if reasons else "No cumple criterios de inclusión"
         
@@ -476,8 +538,8 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             elif any(w in t_col_lower for w in ["intervención", "intervencion", "exposición", "exposicion", "intervention", "exposure", "tratamiento"]):
                 interv_patterns = [
                     r'(?:treated?\s+with|administered|received?|exposed?\s+to|intervención(?:\s+\w+){0,3})\s+([\w\-\s]+(?:\d+\s*(?:mg|g|mcg|IU|ml|ug))?)',
-                    r'(?:mg|g|mcg|IU|dose)[^.]{0,80}',
-                    r'(?:vs\.?|versus|compared\s+to|frente\s+a)[^.]{0,80}',
+                    r'(?:mg|g|mcg|IU|dose)[^.]+',
+                    r'(?:vs\.?|versus|compared\s+to|frente\s+a)[^.]+',
                 ]
                 target_search = abstract if (abstract and abstract.strip() not in ("", "nan", "Abstract no disponible.", "n/a")) else search_text
                 for pat in interv_patterns:
@@ -491,9 +553,9 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 7. Desenlace / Outcome
             elif any(w in t_col_lower for w in ["desenlace", "outcome", "endpoint", "result", "resultado"]):
                 outcome_patterns = [
-                    r'(?:primary\s+outcome|desenlace\s+primario|endpoint)[\s:]+([^.]{20,120})',
-                    r'(?:mortality|survival|incidence|prevalence|mortalidad|supervivencia|incidencia)[^.]{0,80}',
-                    r'(?:reduce[ds]?|decrease[ds]?|improve[ds]?|reduj|mejor)[^.]{0,80}',
+                    r'(?:primary\s+outcome|desenlace\s+primario|endpoint)[\s:]+([^.]+)',
+                    r'(?:mortality|survival|incidence|prevalence|mortalidad|supervivencia|incidencia)[^.]+',
+                    r'(?:reduce[ds]?|decrease[ds]?|improve[ds]?|reduj|mejor)[^.]+',
                 ]
                 for pat in outcome_patterns:
                     m = re.search(pat, search_text, re.IGNORECASE)
@@ -505,9 +567,9 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 8. Población / Muestra
             elif any(w in t_col_lower for w in ["población", "poblacion", "muestra", "sujetos", "population", "sample", "paciente", "participant"]):
                 pop_patterns = [
-                    r'(\d+\s*(?:patients?|participants?|subjects?|adults?|children|pacientes?|sujetos?|individuos?)(?:[^.]{0,60})?)',
-                    r'(?:n\s*=\s*\d+[^.]{0,60})',
-                    r'(?:aged?\s+\d+[\s-]\d+|edad\s+(?:entre\s+)?\d+[^.]{0,40})',
+                    r'(\d+\s*(?:patients?|participants?|subjects?|adults?|children|pacientes?|sujetos?|individuos?)(?:[^.]+)?)',
+                    r'(?:n\s*=\s*\d+[^.]*)',
+                    r'(?:aged?\s+\d+[\s-]\d+|edad\s+(?:entre\s+)?\d+[^.]*)',
                 ]
                 for pat in pop_patterns:
                     m = re.search(pat, search_text, re.IGNORECASE)
@@ -519,9 +581,9 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 9. Limitaciones (genérico, pero semántico)
             elif any(w in t_col_lower for w in ["limitación", "limitacion", "limitation", "limitante", "cuello", "debilidad", "sesgo", "bias", "bottleneck"]):
                 limit_patterns = [
-                    r'(?:limitation|limitación|debilidad|shortcoming|weakness|sin embargo|however)[^.]{0,120}',
-                    r'(?:small\s+sample|muestra\s+pequeña|corto\s+seguimiento|short\s+follow)[^.]{0,80}',
-                    r'(?:future\s+(?:studies?|research)|estudios?\ futuros?)[^.]{0,80}',
+                    r'(?:limitation|limitación|debilidad|shortcoming|weakness|sin embargo|however)[^.]+',
+                    r'(?:small\s+sample|muestra\s+pequeña|corto\s+seguimiento|short\s+follow)[^.]+',
+                    r'(?:future\s+(?:studies?|research)|estudios?\ futuros?)[^.]+',
                 ]
                 for pat in limit_patterns:
                     m = re.search(pat, search_text, re.IGNORECASE)
@@ -543,16 +605,37 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             elif any(w in t_col_lower for w in ["nivel de evidencia", "grade", "evidencia (grade)"]):
                 grade_patterns = [
                     r'\b(alta|moderada|baja|muy\s+baja|high|moderate|low|very\s+low)\b',
-                    r'\b(systematic review|meta.analysis|rct|randomized|cohort|case.control|cross.sectional)\b',
                 ]
                 target_search = abstract if (abstract and abstract.strip() not in ("", "nan", "Abstract no disponible.", "n/a")) else search_text
+                
+                found_grade = None
                 for pat in grade_patterns:
                     m = re.search(pat, target_search, re.IGNORECASE)
                     if m:
-                        val = m.group(0).strip().title()
+                        found_grade = m.group(0).strip().title()
+                        # Normalizar a español
+                        g_lower = found_grade.lower()
+                        if "high" in g_lower: found_grade = "Alta"
+                        elif "moderate" in g_lower: found_grade = "Moderada"
+                        elif "very low" in g_lower: found_grade = "Muy baja"
+                        elif "low" in g_lower: found_grade = "Baja"
                         break
+                
+                if found_grade:
+                    val = found_grade
                 else:
-                    val = "No reportado"
+                    # Mapear por tipo de estudio a un nivel válido GRADE
+                    design_patterns = [
+                        (r'\b(systematic review|meta.analysis|rct|randomized controlled trial)\b', "Alta"),
+                        (r'\b(cohort|case.control|prospective|retrospective)\b', "Moderada"),
+                        (r'\b(cross.sectional|transversal|observational|survey)\b', "Baja"),
+                    ]
+                    for pat, grade_val in design_patterns:
+                        if re.search(pat, target_search, re.IGNORECASE):
+                            val = grade_val
+                            break
+                    else:
+                        val = "Moderada"  # Fallback estándar
 
 
             # 10. Fallback genérico semántico: busca oración relevante por palabras clave de la columna
