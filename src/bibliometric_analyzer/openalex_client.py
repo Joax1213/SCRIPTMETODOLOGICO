@@ -1,7 +1,7 @@
 import urllib.request
 import json
 import logging
-from .utils import parse_author_name, format_authors_list, get_ssl_context
+from .utils import format_authors_list, get_ssl_context
 
 logger = logging.getLogger("bibliometric_analyzer")
 

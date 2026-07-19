@@ -312,7 +312,7 @@ def main():
                 sys.exit(1)
                 
             logger.info("\n" + "=" * 60)
-            logger.info(f"   INICIANDO INVESTIGACIÓN AUTOMATIZADA DESDE CERO")
+            logger.info("   INICIANDO INVESTIGACIÓN AUTOMATIZADA DESDE CERO")
             logger.info(f"   Tema: '{args.search_query}' (Tema: {args.theme})")
             logger.info("=" * 60 + "\n")
             
@@ -393,7 +393,7 @@ def main():
                 
             seed_doi = (seed_work.get("doi") or "").replace("https://doi.org/", "")
             seed_title = seed_work.get("title", "Sin título")
-            logger.info(f"   [+] Artículo semilla seleccionado:")
+            logger.info("   [+] Artículo semilla seleccionado:")
             logger.info(f"       Título: {seed_title}")
             logger.info(f"       DOI: {seed_doi}")
         

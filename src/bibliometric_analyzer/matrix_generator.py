@@ -6,8 +6,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from .utils import get_fallback_year
-from .themes import get_theme, BASE_COLUMNS, QUALITY_COLUMNS, CLUSTER_COLORS
+from .themes import get_theme, BASE_COLUMNS, QUALITY_COLUMNS
 
 logger = logging.getLogger("bibliometric_analyzer")
 

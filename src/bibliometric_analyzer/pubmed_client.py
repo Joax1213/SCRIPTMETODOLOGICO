@@ -3,8 +3,7 @@ import urllib.parse
 import json
 import logging
 import re
-import xml.etree.ElementTree as ET
-from .utils import parse_author_name, format_authors_list, get_fallback_year, get_ssl_context
+from .utils import format_authors_list, get_fallback_year, get_ssl_context
 
 logger = logging.getLogger("bibliometric_analyzer")
 

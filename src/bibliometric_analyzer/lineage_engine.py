@@ -248,7 +248,7 @@ def validate_paper_criteria(title, abstract, year, full_text=None, start_year=No
         )
         
         if not (has_precursor and has_concentration):
-            logger.debug(f"[Filtro Precursor] Falta mención de precursor/concentración en texto. Descartado.")
+            logger.debug("[Filtro Precursor] Falta mención de precursor/concentración en texto. Descartado.")
             return False
 
     return True
@@ -316,7 +316,7 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
                 success = download_pdf(pdf_url, dest_path, verbose=verbose, verify_ssl=verify_ssl)
                 
             if not success:
-                logger.debug(f"      [~] Intentando fallback con Unpaywall API...")
+                logger.debug("      [~] Intentando fallback con Unpaywall API...")
                 unpaywall_url = get_unpaywall_pdf_url(clean_doi, contact_email, verbose=verbose, verify_ssl=verify_ssl)
                 if unpaywall_url:
                     logger.info(f"      [~] Descargando desde Unpaywall: {unpaywall_url}")
@@ -375,7 +375,7 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
                     "DOI": curr_doi,
                     "Nivel": curr_level,
                     "Pilar": pilar,
-                    "Razón": f"Excluido por filtro temático de disciplina (Nivel > 0)."
+                    "Razón": "Excluido por filtro temático de disciplina (Nivel > 0)."
                 })
                 continue
 
