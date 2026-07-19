@@ -80,19 +80,28 @@ def install_dependencies():
     logger.info("Instalando dependencias requeridas...")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install",
-                               "pandas", "openpyxl", "networkx", "pypdf", "python-dotenv"])
+                               "pandas", "openpyxl", "networkx", "pypdf", "python-dotenv", "requests"])
         logger.info("¡Dependencias instaladas con éxito!")
     except Exception as e:
         logger.error(f"Error al instalar dependencias: {e}")
         sys.exit(1)
 
 def check_dependencies():
+    # Mapa: nombre_display -> nombre_de_import (resuelve ambigüedades como python-dotenv -> dotenv)
+    dep_import_map = {
+        "pandas": "pandas",
+        "openpyxl": "openpyxl",
+        "networkx": "networkx",
+        "pypdf": "pypdf",
+        "python-dotenv": "dotenv",
+        "requests": "requests",
+    }
     missing = []
-    for dep in ["pandas", "openpyxl", "networkx", "pypdf", "dotenv"]:
+    for display_name, import_name in dep_import_map.items():
         try:
-            __import__("pypdf" if dep == "pypdf" else dep)
+            __import__(import_name)
         except ImportError:
-            missing.append(dep)
+            missing.append(display_name)
     if missing:
         logger.warning(f"Faltan dependencias: {', '.join(missing)}")
         logger.info("Ejecuta `--install-deps` para instalarlas automáticamente.")

@@ -2,7 +2,6 @@ import os
 import re
 import logging
 import base64
-import requests
 import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -15,6 +14,7 @@ logger = logging.getLogger("bibliometric_analyzer")
 def render_mermaid_to_png(mermaid_code, output_png_path):
     """Renderiza un diagrama Mermaid a un archivo PNG utilizando la API pública de mermaid.ink."""
     try:
+        import requests  # lazy import: solo se usa en esta función auxiliar
         mermaid_bytes = mermaid_code.encode("utf-8")
         base64_str = base64.urlsafe_b64encode(mermaid_bytes).decode("utf-8").rstrip("=")
         url = f"https://mermaid.ink/img/{base64_str}"
@@ -295,7 +295,8 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         search_text_lower = search_text.lower()
         
         authors = data.get("Autores", "Desconocido")
-        first_author = authors.split(",")[0].strip() if "," in authors else authors.split()[0]
+        _parts = authors.split(",") if "," in authors else authors.split()
+        first_author = _parts[0].strip() if _parts else "Desconocido"
         author_year = f"{first_author} ({data.get('Año', 'N/A')})"
         
         row = {col: "" for col in cols}
@@ -414,9 +415,24 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                     
             row[t_col] = val
             
-        row["Calidad del Estudio (Alta/Media/Baja)"] = "Alta" if idx % 3 != 0 else "Media"
-        row["Riesgo de Sesgo"] = "Bajo" if idx % 4 != 0 else "Moderado"
-        row["Nivel de Evidencia"] = "Fuerte" if idx % 3 != 0 else "Moderado"
+        # Inferir calidad, sesgo y evidencia a partir del contenido del abstract/texto
+        _abs_lower = abstract.lower()
+        _has_stats = any(w in _abs_lower for w in [
+            "p < 0.05", "p<0.05", "significance", "confidence interval", "95% ci",
+            "standard deviation", "mean ±", "anova", "regression", "odds ratio",
+            "statistical", "p-value", "p value", "desviación estándar"
+        ])
+        _has_controls = any(w in _abs_lower for w in [
+            "control group", "control negativo", "randomized", "blinded",
+            "placebo", "replicate", "validated", "calibrated", "replicado", "calibrado"
+        ])
+        _low_bias = any(w in _abs_lower for w in [
+            "randomized", "double-blind", "systematic review", "meta-analysis",
+            "cochrane", "grade", "revisión sistemática", "ensayo clínico aleatorizado"
+        ])
+        row["Calidad del Estudio (Alta/Media/Baja)"] = "Alta" if (_has_stats and _has_controls) else ("Media" if _has_stats else "Por revisar")
+        row["Riesgo de Sesgo"] = "Bajo" if _low_bias else ("Moderado" if _has_controls else "Por revisar")
+        row["Nivel de Evidencia"] = "Fuerte" if _low_bias else ("Moderado" if _has_stats else "Limitado")
         
         rows.append(row)
         
@@ -443,7 +459,8 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
     df_themes = pd.DataFrame(rows_themes)
 
     rango_años = f"{df_detail['Año'].min()} - {df_detail['Año'].max()}" if not df_detail.empty else "N/A"
-    revista_top = df_detail['Revista'].value_counts().index[0] if not df_detail.empty else "N/A"
+    _vc_revistas = df_detail['Revista'].value_counts() if not df_detail.empty else pd.Series(dtype=str)
+    revista_top = _vc_revistas.index[0] if not _vc_revistas.empty else "N/A"
     
     resumen_data = {
         "Métrica Cienciométrica": [

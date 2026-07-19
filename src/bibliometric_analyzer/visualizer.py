@@ -102,6 +102,7 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
                     f_vis.write(r.read())
         except Exception as e:
             logger.warning(f"[HTML] Advertencia: No se pudo descargar vis-network.min.js: {e}")
+            logger.warning("[HTML] Fallback: El visor HTML usará CDN remoto (unpkg.com) — requiere conexión a internet para funcionar.")
             
     if not os.path.exists(plotly_local_path):
         try:
@@ -112,6 +113,7 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
                     f_plotly.write(r.read())
         except Exception as e:
             logger.warning(f"[HTML] Advertencia: No se pudo descargar plotly.min.js: {e}")
+            logger.warning("[HTML] Fallback: El visor HTML usará CDN remoto (cdn.plot.ly) — requiere conexión a internet para funcionar.")
             
     all_extracted_keywords = []
     

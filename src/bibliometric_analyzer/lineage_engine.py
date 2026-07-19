@@ -192,7 +192,8 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
             source_api = "openalex"
 
     if payload:
-        if not payload.get("Abstract") or "Abstract no disponible" in payload.get("Abstract"):
+        _abstract_check = payload.get("Abstract", "")
+        if not _abstract_check or "Abstract no disponible" in _abstract_check:
             logger.debug(f"[Lineage] Cruzando abstract vacío de {clean_doi} con OpenAlex...")
             alex_fallback = get_openalex_paper_data(clean_doi, contact_email, verify_ssl=verify_ssl)
             if alex_fallback:
@@ -263,7 +264,14 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
     bfs_filter_keywords = theme_spec.get("bfs_filter_keywords", [])
 
     local_pdfs = index_local_pdfs(pdf_dir, verbose=verbose) if pdf_dir else {}
-    documentos_temporales_dir = "documentos_temporales"
+    # Determinar directorio de salida para PDFs temporales (usa el mismo que el output HTML/MD)
+    if output_html:
+        _out_base = os.path.dirname(os.path.abspath(output_html))
+    elif output_md:
+        _out_base = os.path.dirname(os.path.abspath(output_md))
+    else:
+        _out_base = os.getcwd()
+    documentos_temporales_dir = os.path.join(_out_base, "documentos_temporales")
     if full_text:
         os.makedirs(documentos_temporales_dir, exist_ok=True)
         logger.info(f"[Texto Completo] Carpeta para descargas temporales: {os.path.abspath(documentos_temporales_dir)}")
@@ -414,7 +422,15 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
         logger.info(f"  - Analizando referencias [{actual_max_refs} de {len(referenced_works)} disponibles]")
         
         for idx, ref_openalex_id in enumerate(referenced_works[:actual_max_refs]):
-            ref_doi = ref_openalex_id.split("/")[-1]
+            # Validación defensiva del ID de referencia
+            if not ref_openalex_id or not isinstance(ref_openalex_id, str):
+                logger.debug(f"  [-] Referencia inválida ignorada (tipo {type(ref_openalex_id)}): {ref_openalex_id}")
+                continue
+            ref_doi_raw = ref_openalex_id.split("/")[-1]
+            if not ref_doi_raw or len(ref_doi_raw) < 3:
+                logger.debug(f"  [-] ID de referencia demasiado corto, ignorado: {ref_openalex_id}")
+                continue
+            ref_doi = ref_doi_raw
             ref_data = get_paper_metadata_unified(ref_doi, api_source, scopus_key, pubmed_key, contact_email, cache, verify_ssl=verify_ssl)
             if ref_data:
                 ref_clean_doi = ref_data["DOI"]

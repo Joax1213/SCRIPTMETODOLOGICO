@@ -177,8 +177,8 @@ def get_citing_papers_pubmed(doi_or_pmid, api_key=None, count=20, verify_ssl=Tru
         if not citing_ids:
             return []
             
-        # Limitar número de citantes
-        target_ids = citing_ids[:count]
+        # Limitar número de citantes; convertir a str para garantizar compatibilidad (elink puede retornar int)
+        target_ids = [str(i) for i in citing_ids[:count]]
         
         # Consultar la información en batch para no quemar la API
         params_summary = {

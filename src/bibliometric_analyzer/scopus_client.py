@@ -80,7 +80,11 @@ def get_citing_papers_scopus(doi, title, api_key, verbose=False, verify_ssl=True
 
     # Determinación de query precisa (REFTITLE es el operador soportado por Scopus Search API para citantes)
     if title and title != "Sin título":
-        escaped_title = title.replace('"', '\\"')
+        # Truncar a las primeras 8 palabras para evitar conflictos con caracteres
+        # especiales de la Scopus Query Language (paréntesis, asteriscos, dos puntos, etc.)
+        title_words = title.split()[:8]
+        short_title = " ".join(title_words)
+        escaped_title = short_title.replace('"', '\\"')
         query = f'REFTITLE("{escaped_title}")'
     elif doi:
         clean_doi = doi.replace("https://doi.org/", "").strip()

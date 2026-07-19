@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import ssl
 import logging
 import datetime
 from pathlib import Path
@@ -156,7 +157,7 @@ class JSONCache:
             logger.error(f"Error al limpiar la caché: {e}")
 
 def get_ssl_context(verify=True):
-    import ssl
+    """Retorna un contexto SSL con verificación activa o desactivada según el parámetro."""
     if verify:
         return ssl.create_default_context()
     else:

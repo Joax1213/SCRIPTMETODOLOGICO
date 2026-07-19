@@ -46,7 +46,6 @@ def find_rscript_path():
 
 
     # 3. Intentar buscar en Program Files o carpetas comunes con glob
-    import glob
     common_paths = [
         r"C:\Program Files\R\R-*\bin\Rscript.exe",
         r"C:\Program Files (x86)\R\R-*\bin\Rscript.exe",
@@ -80,7 +79,11 @@ def ensure_r_packages(rscript_path):
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             f.write(check_code)
             
-        res = subprocess.run([rscript_path, temp_path], capture_output=True, text=True, check=True)
+        try:
+            res = subprocess.run([rscript_path, temp_path], capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"[R Bridge] Error al ejecutar Rscript durante verificación de paquetes: {e.stderr.strip()}")
+            return False
         output = res.stdout.strip()
         if "ALL_OK" in output:
             logger.info("Todos los paquetes de R requeridos están instalados.")
