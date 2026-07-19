@@ -373,8 +373,6 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         search_text = title + " " + abstract + " " + (texto_completo or "")
         search_text_lower = search_text.lower()
         
-        authors = data.get("Autores", "Desconocido")
-        
         row = {col: "" for col in cols}
         row["#"] = idx
         row["ID_OpenAlex"] = data.get("ID", "")
