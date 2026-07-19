@@ -268,7 +268,6 @@ El análisis cualitativo de la muestra de **{total_papers} artículos** revela l
     return None, {}
 
 analyze_quality_bias_from_excel = parse_quality_and_bias
-alyze_quality_bias_from_excel = parse_quality_and_bias
 
 def generate_rqs_markdown(input_file, quality_stats=None):
     """Auto-genera preguntas de investigación (RQs) dinámicas a partir de las keywords más frecuentes del corpus.
