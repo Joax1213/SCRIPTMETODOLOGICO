@@ -656,7 +656,11 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         })
     df_themes = pd.DataFrame(rows_themes)
 
-    rango_años = f"{df_detail['Año'].min()} - {df_detail['Año'].max()}" if not df_detail.empty else "N/A"
+    if not df_detail.empty:
+        valid_years = pd.to_numeric(df_detail['Año'], errors='coerce').dropna().astype(int)
+        rango_años = f"{valid_years.min()} - {valid_years.max()}" if not valid_years.empty else "N/A"
+    else:
+        rango_años = "N/A"
     _vc_revistas = df_detail['Revista'].value_counts() if not df_detail.empty else pd.Series(dtype=str)
     revista_top = _vc_revistas.index[0] if not _vc_revistas.empty else "N/A"
     
