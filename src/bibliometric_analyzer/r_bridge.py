@@ -493,24 +493,44 @@ def run_r_report(rscript_path, input_file, output_html):
     except Exception as e:
         logger.warning(f"Advertencia: No se pudo guardar el archivo Mermaid de PRISMA: {e}")
         
-    # Consumir la API pública de Kroki para descargar diagramas PRISMA físicos en PNG y JPG
+    # Consumir la API pública de Kroki / mermaid.ink para descargar diagramas PRISMA físicos en PNG y JPG
     try:
         import base64
-        import zlib
         import requests
         
-        compressed = zlib.compress(prisma_mermaid.encode('utf-8'))
-        encoded = base64.urlsafe_b64encode(compressed).decode('utf-8')
-        
-        # Descargar y escribir PNG
-        r_png = requests.get(f"https://kroki.io/mermaid/png/{encoded}", timeout=15)
-        if r_png.status_code == 200:
-            with open(os.path.join(figuras_dir, "metodologia_prisma.png"), "wb") as f_png:
-                f_png.write(r_png.content)
+        success = False
+        # Intento 1: mermaid.ink (más moderno y compatible sin compresión)
+        try:
+            mermaid_bytes = prisma_mermaid.encode("utf-8")
+            base64_str = base64.urlsafe_b64encode(mermaid_bytes).decode("utf-8").rstrip("=")
+            ink_url = f"https://mermaid.ink/img/{base64_str}"
+            r_png = requests.get(ink_url, timeout=15)
+            if r_png.status_code == 200:
+                with open(os.path.join(figuras_dir, "metodologia_prisma.png"), "wb") as f_png:
+                    f_png.write(r_png.content)
+                success = True
+                logger.info("[PRISMA] Renderizado exitoso vía mermaid.ink")
+        except Exception as e:
+            logger.warning(f"Advertencia: Falló renderizado en mermaid.ink ({e}). Probando fallback Kroki...")
+
+        # Intento 2: Fallback Kroki
+        if not success:
+            try:
+                import zlib
+                compressed = zlib.compress(prisma_mermaid.encode('utf-8'))
+                encoded = base64.urlsafe_b64encode(compressed).decode('utf-8')
+                r_png = requests.get(f"https://kroki.io/mermaid/png/{encoded}", timeout=15)
+                if r_png.status_code == 200:
+                    with open(os.path.join(figuras_dir, "metodologia_prisma.png"), "wb") as f_png:
+                        f_png.write(r_png.content)
+                    success = True
+                    logger.info("[PRISMA] Renderizado exitoso vía Kroki")
+            except Exception as e:
+                logger.warning(f"Advertencia: Falló renderizado en Kroki ({e})")
                 
         # Convertir localmente a JPG usando Pillow (rellenando canal alfa transparente con blanco)
         png_path = os.path.join(figuras_dir, "metodologia_prisma.png")
-        if os.path.exists(png_path):
+        if success and os.path.exists(png_path):
             try:
                 from PIL import Image
                 im = Image.open(png_path)
@@ -523,7 +543,7 @@ def run_r_report(rscript_path, input_file, output_html):
             except Exception as e:
                 logger.warning(f"Advertencia: No se pudo convertir PNG a JPG localmente: {e}")
     except Exception as e:
-        logger.warning(f"Advertencia: No se pudo renderizar PRISMA a PNG/JPG mediante Kroki: {e}")
+        logger.warning(f"Advertencia: No se pudo renderizar PRISMA a PNG/JPG: {e}")
 
     # Escapar llaves para evitar colisiones en f-string
     quality_esc = quality_section.replace("{", "{{").replace("}", "}}")

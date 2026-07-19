@@ -1,6 +1,8 @@
 import os
 import re
 import logging
+import base64
+import requests
 import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -9,6 +11,25 @@ from .utils import get_fallback_year
 from .themes import get_theme, BASE_COLUMNS, QUALITY_COLUMNS, CLUSTER_COLORS
 
 logger = logging.getLogger("bibliometric_analyzer")
+
+def render_mermaid_to_png(mermaid_code, output_png_path):
+    """Renderiza un diagrama Mermaid a un archivo PNG utilizando la API pública de mermaid.ink."""
+    try:
+        mermaid_bytes = mermaid_code.encode("utf-8")
+        base64_str = base64.urlsafe_b64encode(mermaid_bytes).decode("utf-8").rstrip("=")
+        url = f"https://mermaid.ink/img/{base64_str}"
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            with open(output_png_path, "wb") as f:
+                f.write(response.content)
+            logger.info(f"Diagrama Mermaid renderizado y guardado exitosamente en: {output_png_path}")
+            return True
+        else:
+            logger.warning(f"No se pudo renderizar Mermaid a PNG (Status de API: {response.status_code})")
+    except Exception as e:
+        logger.warning(f"Error al renderizar Mermaid a PNG vía API: {e}")
+    return False
+
 
 def generate_audit_matrix_template(output_path, theme="general"):
     """Genera una plantilla Excel de auditoría unificada según el tema seleccionado con estilos premium."""
@@ -105,6 +126,11 @@ def run_interactive_prisma_flow(output_path=None):
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(mermaid_code)
             logger.info(f"Código del diagrama PRISMA guardado en: {output_path}")
+            
+            # Intentar compilar a PNG automáticamente en el mismo directorio
+            base, _ = os.path.splitext(output_path)
+            png_path = base + ".png"
+            render_mermaid_to_png(mermaid_code, png_path)
             
     except Exception as e:
         logger.error(f"Error al ejecutar el flujo interactivo de PRISMA: {e}")
@@ -284,6 +310,7 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         row["Descubrimientos Principales"] = data.get("Descubrimientos Principales", "")
         row["Aporte al Tema"] = data.get("Aporte al Tema", "")
         
+        used_sentences = set()
         for t_col in theme_cols:
             t_col_lower = t_col.lower()
             val = "No reportado"
@@ -335,11 +362,56 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                 ]
                 val = limitantes[idx % len(limitantes)]
             else:
-                sentences = re.split(r'\. (?=[A-Z])', search_text)
-                for sent in sentences:
-                    if any(w in sent for w in ["we ", "the ", "results ", "findings ", "experimental "]) and len(sent.strip()) > 20:
-                        val = sent.strip()[:60] + "..."
+                col_kws = {
+                    "población": ["patient", "student", "participant", "consumer", "company", "tourist", "subject", "cohort", "individual", "population", "sample"],
+                    "poblacion": ["patient", "student", "participant", "consumer", "company", "tourist", "subject", "cohort", "individual", "population", "sample"],
+                    "muestra": ["sample", "cohort", "population", "participant", "student"],
+                    "sujetos": ["patient", "subject", "individual", "participant"],
+                    "diseño": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
+                    "diseno": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
+                    "metodología": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
+                    "metodologia": ["experimental", "observational", "randomized", "rct", "survey", "review", "meta-analysis", "qualitative", "quantitative", "case study", "design"],
+                    "variables": ["variable", "measure", "indicator", "metric", "kpi", "outcome", "dependent", "independent"],
+                    "indicadores": ["variable", "measure", "indicator", "metric", "kpi", "outcome"],
+                    "resultados": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant"],
+                    "hallazgos": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant"],
+                    "descubrimientos": ["result", "find", "show", "demonstrate", "observe", "conclude", "significant"],
+                    "limitaciones": ["limitation", "bias", "shortcoming", "weakness", "hazard", "threat"],
+                    "sesgo": ["limitation", "bias", "shortcoming", "weakness", "hazard", "threat"],
+                    "riesgo": ["limitation", "bias", "shortcoming", "weakness", "hazard", "threat"]
+                }
+                
+                found_match = False
+                matched_kws = []
+                for kw_key, kw_list in col_kws.items():
+                    if kw_key in t_col_lower:
+                        matched_kws = kw_list
                         break
+                        
+                sentences = re.split(r'\. (?=[A-Z])', search_text)
+                
+                if matched_kws:
+                    for sent in sentences:
+                        sent_clean = sent.strip()
+                        sent_lower = sent_clean.lower()
+                        if any(w in sent_lower for w in matched_kws) and len(sent_clean) > 20 and sent_clean not in used_sentences:
+                            val = sent_clean[:70] + "..."
+                            used_sentences.add(sent_clean)
+                            found_match = True
+                            break
+                            
+                if not found_match:
+                    for sent in sentences:
+                        sent_clean = sent.strip()
+                        if len(sent_clean) > 20 and sent_clean not in used_sentences:
+                            val = sent_clean[:70] + "..."
+                            used_sentences.add(sent_clean)
+                            found_match = True
+                            break
+                            
+                if not found_match:
+                    val = "Revisar en texto completo"
+                    
             row[t_col] = val
             
         row["Calidad del Estudio (Alta/Media/Baja)"] = "Alta" if idx % 3 != 0 else "Media"
