@@ -122,8 +122,9 @@ def get_paper_metadata_unified(doi, api_source, scopus_key, pubmed_key, contact_
         scopus_data = get_scopus_paper_data(clean_doi, scopus_key, verify_ssl=verify_ssl)
         if scopus_data:
             title = scopus_data.get("dc:title", "Sin título")
-            cover_date = scopus_data.get("prism:coverDate", "")
-            year = cover_date.split("-")[0] if "-" in cover_date else str(get_fallback_year())
+            cover_date = scopus_data.get("prism:coverDate")
+            cover_date_str = str(cover_date) if cover_date else ""
+            year = cover_date_str.split("-")[0] if "-" in cover_date_str else str(get_fallback_year())
             journal = scopus_data.get("prism:publicationName", "N/A")
             
             creator = scopus_data.get("dc:creator", "Desconocido")

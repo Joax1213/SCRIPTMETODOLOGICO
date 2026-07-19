@@ -109,8 +109,9 @@ def get_pubmed_paper_data(pmid_or_doi, api_key=None, verify_ssl=True):
         author_name = format_authors_list(authors_list)
         
         # Año
-        pub_date = summary.get("pubdate", "")
-        year_match = re.search(r'\b(19|20)\d{2}\b', pub_date)
+        pub_date = summary.get("pubdate")
+        pub_date_str = str(pub_date) if pub_date else ""
+        year_match = re.search(r'\b(19|20)\d{2}\b', pub_date_str)
         year = year_match.group(0) if year_match else str(get_fallback_year())
         
         journal = summary.get("source", "N/A")
@@ -201,9 +202,9 @@ def get_citing_papers_pubmed(doi_or_pmid, api_key=None, count=20, verify_ssl=Tru
                 authors_list = [a.get("name", "") for a in authors]
                 author_name = format_authors_list(authors_list)
                 
-                # Año
-                pub_date = summary.get("pubdate", "")
-                year_match = re.search(r'\b(19|20)\d{2}\b', pub_date)
+                pub_date = summary.get("pubdate")
+                pub_date_str = str(pub_date) if pub_date else ""
+                year_match = re.search(r'\b(19|20)\d{2}\b', pub_date_str)
                 year = year_match.group(0) if year_match else str(get_fallback_year())
                 
                 journal = summary.get("source", "N/A")

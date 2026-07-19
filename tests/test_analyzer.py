@@ -363,6 +363,33 @@ class TestScopusClient(unittest.TestCase):
         res = get_scopus_abstract("2-s2.0-85041516661", "fake_key")
         self.assertEqual(res, "This is a scopus abstract description.")
 
+    @patch('urllib.request.urlopen')
+    @patch('bibliometric_analyzer.scopus_client.get_scopus_abstract')
+    def test_scopus_null_coverdate(self, mock_get_abstract, mock_urlopen):
+        from bibliometric_analyzer.scopus_client import get_citing_papers_scopus
+        
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = b'''{
+            "search-results": {
+                "entry": [{
+                    "dc:title": "Null CoverDate Paper",
+                    "dc:creator": "Desconocido",
+                    "prism:coverDate": null,
+                    "prism:publicationName": "N/A",
+                    "eid": "2-s2.0-12345"
+                }]
+            }
+        }'''
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        mock_get_abstract.return_value = "Mock abstract"
+        
+        res = get_citing_papers_scopus("10.1234/null_date", "Null CoverDate Paper", "fake_key")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["Título"], "Null CoverDate Paper")
+        from bibliometric_analyzer.utils import get_fallback_year
+        self.assertEqual(res[0]["Año"], str(get_fallback_year()))
+
 
 class TestPubmedClient(unittest.TestCase):
 
@@ -411,6 +438,23 @@ class TestPubmedClient(unittest.TestCase):
         
         res = get_pubmed_paper_data("10.1234/test_empty", "fake_key")
         self.assertIsNone(res)
+
+    @patch('bibliometric_analyzer.pubmed_client._make_entrez_request')
+    def test_pubmed_null_pubdate(self, mock_request):
+        from bibliometric_analyzer.pubmed_client import get_pubmed_paper_data
+        
+        # Simular que esummary retorna pubdate nula
+        mock_request.side_effect = [
+            b'{"esearchresult": {"idlist": ["123456"]}}', # esearch
+            b'{"result": {"uids": ["123456"], "123456": {"title": "Pubmed Null Pubdate Article", "authors": [], "pubdate": null, "source": "Journal"}}}', # esummary
+            b'<AbstractText>This is a pubmed abstract.</AbstractText>' # efetch
+        ]
+        
+        res = get_pubmed_paper_data("10.1234/test_null_pubdate", "fake_key")
+        self.assertIsNotNone(res)
+        self.assertEqual(res["Título"], "Pubmed Null Pubdate Article")
+        from bibliometric_analyzer.utils import get_fallback_year
+        self.assertEqual(res["Año"], str(get_fallback_year()))
 
 
 class TestOpenAlexClient(unittest.TestCase):

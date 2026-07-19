@@ -127,8 +127,9 @@ def get_citing_papers_scopus(doi, title, api_key, verbose=False, verify_ssl=True
                     creator = entry.get("dc:creator", "Desconocido")
                     author_name = parse_author_name(creator)
                     
-                    cover_date = entry.get("prism:coverDate", "")
-                    publication_year = cover_date.split("-")[0] if "-" in cover_date else str(get_fallback_year())
+                    cover_date = entry.get("prism:coverDate")
+                    cover_date_str = str(cover_date) if cover_date else ""
+                    publication_year = cover_date_str.split("-")[0] if "-" in cover_date_str else str(get_fallback_year())
                     journal = entry.get("prism:publicationName", "N/A")
                     
                     eid = entry.get("eid")
