@@ -172,7 +172,6 @@ class TestJSONCache(unittest.TestCase):
 class TestCLISmoke(unittest.TestCase):
 
     def test_cli_parser_args(self):
-        import sys
         from unittest.mock import patch
         from bibliometric_analyzer.cli import main
 
@@ -190,7 +189,6 @@ class TestCLISmoke(unittest.TestCase):
                         self.assertTrue(kwargs['verify_ssl'])
 
     def test_cli_pipeline_with_output_dir(self):
-        import sys
         from unittest.mock import patch
         from bibliometric_analyzer.cli import main
 
@@ -217,8 +215,9 @@ class TestCLISmoke(unittest.TestCase):
                 except SystemExit:
                     pass
                 
-                # Verificar que el linaje se llamó con la ruta del output_dir
+                # Verificar que el linaje y la matriz se llamaron con la ruta del output_dir
                 mock_execute.assert_called_once()
+                mock_matrix.assert_called_once()
                 _, kwargs = mock_execute.call_args
                 self.assertTrue(kwargs['output_html'].startswith('CUSTOM_DIR'))
 

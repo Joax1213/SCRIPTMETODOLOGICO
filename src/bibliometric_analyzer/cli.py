@@ -278,20 +278,32 @@ def main():
     rscript_path = find_rscript_path()
 
     if args.check_r:
+        if not rscript_path:
+            logger.error("Error: Rscript no encontrado en el sistema. Instale R y añádalo al PATH.")
+            sys.exit(1)
         ensure_r_packages(rscript_path)
         sys.exit(0)
 
     if args.biblioshiny:
+        if not rscript_path:
+            logger.error("Error: Rscript no encontrado en el sistema. Instale R y añádalo al PATH.")
+            sys.exit(1)
         ensure_r_packages(rscript_path)
         run_biblioshiny(rscript_path)
         sys.exit(0)
 
     if args.r_report:
+        if not rscript_path:
+            logger.error("Error: Rscript no encontrado en el sistema. Instale R y añádalo al PATH para generar reportes en R.")
+            sys.exit(1)
         ensure_r_packages(rscript_path)
         run_r_report(rscript_path, args.input, args.output_html)
         sys.exit(0)
 
     if args.r_native:
+        if not rscript_path:
+            logger.error("Error: Rscript no encontrado en el sistema. Instale R y añádalo al PATH para el análisis cienciométrico nativo.")
+            sys.exit(1)
         ensure_r_packages(rscript_path)
         run_r_native_analysis(rscript_path, args.input, args.output_html, args.output_md)
         sys.exit(0)
