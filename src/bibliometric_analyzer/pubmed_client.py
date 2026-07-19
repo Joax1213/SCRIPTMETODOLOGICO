@@ -95,9 +95,10 @@ def get_pubmed_paper_data(pmid_or_doi, api_key=None, verify_ssl=True):
     try:
         data = json.loads(response.decode("utf-8"))
         result = data.get("result", {})
-        uid = result.get("uids", [None])[0]
-        if not uid:
+        uids = result.get("uids", [])
+        if not uids:
             return None
+        uid = uids[0]
             
         summary = result.get(uid, {})
         title = summary.get("title", "Sin título")

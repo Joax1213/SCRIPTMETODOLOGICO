@@ -29,10 +29,10 @@ def parse_author_name(creator):
     Normaliza y formatea un nombre de autor en formato 'Apellido, I.' (iniciales).
     Soporta apellidos simples y compuestos.
     """
-    if not creator or creator == "Desconocido":
+    if not creator or str(creator).strip() == "" or str(creator).strip().lower() in ("desconocido", "nan", "none"):
         return "Desconocido"
     
-    creator = creator.strip()
+    creator = str(creator).strip()
     
     # Si ya contiene comas (formato típico 'Apellido, Nombre')
     if "," in creator:

@@ -338,12 +338,16 @@ def main():
                 logger.error("No se encontraron artículos semilla para el tema ingresado.")
                 sys.exit(1)
                 
+            from .themes import get_theme
+            theme_spec = get_theme(args.theme)
+            precursor_keywords = theme_spec.get("precursor_keywords", [])
+
             valid_candidates = []
             for r in results:
                 r_title = r.get("title", "")
                 r_year = r.get("year") or r.get("publication_year")
                 r_abstract = r.get("abstract", "")
-                if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter):
+                if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter, precursor_keywords=precursor_keywords):
                     valid_candidates.append(r)
                     
             if not valid_candidates:
@@ -362,7 +366,7 @@ def main():
                     r_title = r.get("title", "")
                     r_year = r.get("year") or r.get("publication_year")
                     r_abstract = r.get("abstract", "")
-                    if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter):
+                    if validate_paper_criteria(r_title, r_abstract, r_year, start_year=args.start_year, end_year=args.end_year, precursor_filter=args.precursor_filter, precursor_keywords=precursor_keywords):
                         valid_candidates.append(r)
 
             if valid_candidates:

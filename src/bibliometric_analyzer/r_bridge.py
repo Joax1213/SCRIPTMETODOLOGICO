@@ -555,11 +555,6 @@ def run_r_report(rscript_path, input_file, output_html):
     except Exception as e:
         logger.warning(f"Advertencia: No se pudo renderizar PRISMA a PNG/JPG: {e}")
 
-    # Escapar llaves para evitar colisiones en f-string
-    quality_esc = quality_section.replace("{", "{{").replace("}", "}}")
-    rqs_esc = rqs_section.replace("{", "{{").replace("}", "}}")
-    prisma_esc = prisma_mermaid.replace("{", "{{").replace("}", "}}")
-    
     temp_csv = None
     if input_file.lower().endswith(".xlsx"):
         temp_csv = convert_xlsx_to_scopus_csv(input_file)
@@ -577,21 +572,11 @@ def run_r_report(rscript_path, input_file, output_html):
     
     dbsource = "scopus"
     
-    r_code = f"""
-    library(bibliometrix)
-    library(rmarkdown)
-    
-    cat("Cargando y convirtiendo datos...\\n")
-    M <- convert2df(file = "{input_esc}", dbsource = "{dbsource}", format = "{format_type}")
-    cat("Ejecutando análisis cienciométrico...\\n")
-    results <- biblioAnalysis(M, sep = ";")
-    
-    # Crear contenido Rmd
-    rmd_content <- '
----
+    # Escribir el Rmd directamente a disco desde Python para evitar Syntax Errors en R
+    rmd_template = """---
 title: "Reporte Cienciométrico Oficial de la Auditoría"
 author: "Antigravity Bibliometrics Engine"
-date: "`r Sys.Date()`"
+date: "{current_date}"
 output:
   html_document:
     theme: cosmo
@@ -599,20 +584,20 @@ output:
     toc_float: true
 ---
 
-```{{r setup, include=FALSE}}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.path = "figuras/")
 ```
 
-```{{=html}}
+```{=html}
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-<script>mermaid.initialize({{startOnLoad:true}});</script>
+<script>mermaid.initialize({startOnLoad:true});</script>
 ```
 
 ### Resumen de la Colección
 
 Este análisis representa el procesamiento cienciométrico nativo de la colección de auditoría.
 
-```{{r echo=FALSE}}
+```{r echo=FALSE}
 cat("Número total de artículos:", results$Articles, "\\n")
 cat("Rango de años:", min(results$Years, na.rm=TRUE), "-", max(results$Years, na.rm=TRUE), "\\n")
 cat("Número total de fuentes:", length(results$Sources), "\\n")
@@ -623,9 +608,9 @@ cat("Autores totales:", length(results$Authors), "\\n")
 
 El proceso de búsqueda, cribado e inclusión de la literatura sistemática se detalla en el siguiente diagrama de flujo:
 
-```{{=html}}
+```{=html}
 <div class="mermaid">
-{prisma_esc}
+{prisma_mermaid}
 </div>
 ```
 
@@ -633,121 +618,132 @@ El proceso de búsqueda, cribado e inclusión de la literatura sistemática se d
 
 #### Principales Autores
 
-```{{r top_autores, echo=FALSE, warning=FALSE, message=FALSE, fig.width=9, fig.height=4}}
+```{r top_autores, echo=FALSE, warning=FALSE, message=FALSE, fig.width=9, fig.height=4}
 library(ggplot2)
 top_authors <- NULL
-tryCatch({{
+tryCatch({
   df_aut <- as.data.frame(results$Authors)
-  if (nrow(df_aut) > 0) {{
+  if (nrow(df_aut) > 0) {
     top_authors <- head(df_aut, 10)
     if (ncol(top_authors) >= 2) names(top_authors) <- c("Author", "Frequency")
-  }}
-}}, error = function(e) {{}})
+  }
+}, error = function(e) {})
 
-if (!is.null(top_authors) && ncol(top_authors) >= 2) {{
+if (!is.null(top_authors) && ncol(top_authors) >= 2) {
   ggplot(top_authors, aes(x = reorder(Author, Frequency), y = Frequency)) +
     geom_bar(stat = "identity", fill = "#1B4332") +
     coord_flip() +
     labs(x = "Autor", y = "Artículos", title = "Top 10 Autores más Productivos") +
     theme_minimal()
-}} else {{
+} else {
   plot.new()
   text(0.5, 0.5, "Datos de autores insuficientes para graficar", cex=1.2)
-}}
+}
 ```
 
 #### Fuentes Más Productivas
 
 Las 10 revistas o fuentes más citadas:
 
-```{{r top_fuentes, echo=FALSE, warning=FALSE, message=FALSE, fig.width=9, fig.height=4}}
+```{r top_fuentes, echo=FALSE, warning=FALSE, message=FALSE, fig.width=9, fig.height=4}
 library(ggplot2)
 top_sources <- NULL
-tryCatch({{
+tryCatch({
   df_src <- as.data.frame(results$Sources)
-  if (nrow(df_src) > 0) {{
+  if (nrow(df_src) > 0) {
     top_sources <- head(df_src, 10)
     if (ncol(top_sources) >= 2) names(top_sources) <- c("Source", "Frequency")
-  }}
-}}, error = function(e) {{}})
+  }
+}, error = function(e) {})
 
-if (!is.null(top_sources) && ncol(top_sources) >= 2) {{
+if (!is.null(top_sources) && ncol(top_sources) >= 2) {
   ggplot(top_sources, aes(x = reorder(Source, Frequency), y = Frequency)) +
     geom_bar(stat = "identity", fill = "#028090") +
     coord_flip() +
     labs(x = "Revista / Fuente", y = "Artículos", title = "Top 10 Fuentes/Revistas") +
     theme_minimal()
-}} else {{
+} else {
   plot.new()
   text(0.5, 0.5, "Datos de fuentes insuficientes para graficar", cex=1.2)
-}}
+}
 ```
 
 #### Conceptos Más Frecuentes
 
 Las 10 palabras clave o términos conceptuales más frecuentes:
 
-```{{r top_conceptos, echo=FALSE, warning=FALSE, message=FALSE, fig.width=9, fig.height=4}}
+```{r top_conceptos, echo=FALSE, warning=FALSE, message=FALSE, fig.width=9, fig.height=4}
 library(ggplot2)
 top_keys <- NULL
-if (!is.null(results$Keywords) && nrow(as.data.frame(results$Keywords)) > 0) {{
-  tryCatch({{
+if (!is.null(results$Keywords) && nrow(as.data.frame(results$Keywords)) > 0) {
+  tryCatch({
     top_keys <- head(as.data.frame(results$Keywords), 10)
     names(top_keys) <- c("Keyword", "Frequency")
-  }}, error = function(e) {{}})
-}}
-if (is.null(top_keys)) {{
+  }, error = function(e) {})
+}
+if (is.null(top_keys)) {
   all_k <- unlist(strsplit(as.character(M$DE), ";"))
   all_k <- c(all_k, unlist(strsplit(as.character(M$ID), ";")))
   all_k <- trimws(all_k)
   all_k <- all_k[all_k != "" & !is.na(all_k)]
-  if (length(all_k) > 0) {{
+  if (length(all_k) > 0) {
     df_k <- as.data.frame(table(all_k))
     df_k <- df_k[order(-df_k$Freq), ]
     top_keys <- head(df_k, 10)
     names(top_keys) <- c("Keyword", "Frequency")
-  }}
-}}
+  }
+}
 
-if (!is.null(top_keys) && nrow(top_keys) > 0) {{
+if (!is.null(top_keys) && nrow(top_keys) > 0) {
   ggplot(top_keys, aes(x = reorder(Keyword, Frequency), y = Frequency)) +
     geom_bar(stat = "identity", fill = "#BC6C25") +
     coord_flip() +
     labs(x = "Palabra Clave", y = "Frecuencia", title = "Top 10 Conceptos más Frecuentes") +
     theme_minimal()
-}} else {{
+} else {
   cat("No se encontraron palabras clave para graficar.\\n")
-}}
+}
 ```
 
 ### Estructura Intelectual: Red Temática de Conceptos (Co-ocurrencia)
 
 El mapa de co-ocurrencia de palabras clave permite observar cómo se asocian y estructuran los conceptos y variables en el cuerpo de la literatura:
 
-```{{r red_conceptual, echo=FALSE, results="hide", warning=FALSE, message=FALSE, fig.width=10, fig.height=8}}
+```{r red_conceptual, echo=FALSE, results="hide", warning=FALSE, message=FALSE, fig.width=10, fig.height=8}
 # Red de palabras clave principales protegida contra datos insuficientes o vacíos
-tryCatch({{
+tryCatch({
   net_k <- biblioNetwork(M, analysis = "co-occurrences", network = "keywords", sep = ";")
   invisible(networkPlot(net_k, n = 15, Title = "Red de Co-ocurrencia de Conceptos (Palabras Clave)", 
               type = "fruchterman", size = TRUE, remove.multiple = FALSE, edges.min = 1, 
               labelsize = 0.7, label.cex = FALSE, halo = TRUE, community.repulsion = 0.8))
-}}, error = function(e) {{
+}, error = function(e) {
   cat("No se pudo generar el mapa de co-ocurrencia temática debido a datos insuficientes o vacíos de palabras clave.\\n")
-}})
+})
 ```
 
-{rqs_esc}
+{rqs_section}
 
-{quality_esc}
-'
+{quality_section}
+"""
+    rmd_template = rmd_template.replace("{current_date}", time.strftime('%Y-%m-%d'))
+    rmd_template = rmd_template.replace("{prisma_mermaid}", prisma_mermaid)
+    rmd_template = rmd_template.replace("{rqs_section}", rqs_section)
+    rmd_template = rmd_template.replace("{quality_section}", quality_section)
 
-    # Escribir Rmd y renderizar a HTML al lado de output_html para conservar figuras/
-    temp_rmd_path <- file.path(dirname("{output_esc}"), "temp_report.Rmd")
-    writeLines(rmd_content, temp_rmd_path)
+    temp_rmd_path = os.path.join(output_dir, "temp_report.Rmd")
+    temp_rmd_path_esc = temp_rmd_path.replace("\\", "\\\\")
+
+    r_code = f"""
+    library(bibliometrix)
+    library(rmarkdown)
+    
+    cat("Cargando y convirtiendo datos...\\n")
+    M <- convert2df(file = "{input_esc}", dbsource = "{dbsource}", format = "{format_type}")
+    cat("Ejecutando análisis cienciométrico...\\n")
+    results <- biblioAnalysis(M, sep = ";")
+    
     cat("Renderizando reporte cienciométrico con R Markdown...\\n")
-    render(temp_rmd_path, output_file = "{output_esc}")
-    file.remove(temp_rmd_path)
-    cat("¡Reporte cienciométrico HTML generado exitosamente!\\n")
+    render("{temp_rmd_path_esc}", output_file = "{output_esc}")
     """
     
     logger.info(f"\n[R-Bibliometrix] Intentando compilar reporte cienciométrico oficial R Markdown para '{input_file}'...")
@@ -755,6 +751,9 @@ tryCatch({{
     fd, temp_path = tempfile.mkstemp(suffix=".R")
     success = False
     try:
+        with open(temp_rmd_path, "w", encoding="utf-8") as f_rmd:
+            f_rmd.write(rmd_template)
+            
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             f.write(r_code)
         subprocess.run([rscript_path, temp_path], check=True)
@@ -882,6 +881,8 @@ tryCatch({{
             os.remove(temp_path)
         if temp_csv and os.path.exists(temp_csv):
             os.remove(temp_csv)
+        if 'temp_rmd_path' in locals() and os.path.exists(temp_rmd_path):
+            os.remove(temp_rmd_path)
 
 def run_r_native_analysis(rscript_path, input_file, output_html, output_md):
     if not input_file:

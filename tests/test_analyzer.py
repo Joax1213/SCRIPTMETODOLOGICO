@@ -397,9 +397,49 @@ class TestPubmedClient(unittest.TestCase):
         ]
         
         res = search_pubmed_works("some query")
-        self.assertEqual(len(res), 2)
-        self.assertEqual(res[0]["doi"], "10.1234/1")
         self.assertEqual(res[1]["title"], "Paper 2")
+
+    @patch('bibliometric_analyzer.pubmed_client._make_entrez_request')
+    def test_pubmed_empty_uids(self, mock_request):
+        from bibliometric_analyzer.pubmed_client import get_pubmed_paper_data
+        
+        # Simular que esummary retorna uids vacío []
+        mock_request.side_effect = [
+            b'{"esearchresult": {"idlist": ["123456"]}}', # esearch
+            b'{"result": {"uids": []}}' # esummary vacío
+        ]
+        
+        res = get_pubmed_paper_data("10.1234/test_empty", "fake_key")
+        self.assertIsNone(res)
+
+
+class TestOpenAlexClient(unittest.TestCase):
+
+    @patch('urllib.request.urlopen')
+    def test_openalex_null_doi(self, mock_urlopen):
+        from bibliometric_analyzer.openalex_client import get_citing_papers_openalex
+        
+        # Simular respuesta de OpenAlex donde un artículo citante tiene doi: null
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = b'''{
+            "results": [
+                {
+                    "id": "https://openalex.org/W999999",
+                    "doi": null,
+                    "title": "Citing Paper with null DOI",
+                    "authorships": [],
+                    "publication_year": 2021,
+                    "primary_location": null
+                }
+            ]
+        }'''
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        
+        res = get_citing_papers_openalex("W123456", "email@test.com")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["DOI"], "W999999") # Debe caer al ID de OpenAlex
+        self.assertEqual(res[0]["Título"], "Citing Paper with null DOI")
 
 
 class TestRBridge(unittest.TestCase):

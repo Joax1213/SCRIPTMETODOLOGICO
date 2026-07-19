@@ -77,7 +77,13 @@ def get_citing_papers_openalex(doi, email, count=20, verify_ssl=True):
                 results = data.get("results", [])
                 for work in results:
                     title = work.get("title", "Sin título")
-                    work_doi = work.get("doi", "").replace("https://doi.org/", "")
+                    raw_doi = work.get("doi")
+                    if raw_doi:
+                        work_doi = raw_doi.replace("https://doi.org/", "").strip()
+                    else:
+                        # Fallback al ID de OpenAlex (ej: W12345678) si no tiene DOI
+                        work_id = work.get("id", "")
+                        work_doi = work_id.split("/")[-1] if work_id else ""
                     
                     authorships = work.get("authorships", [])
                     authors_list = [a.get("author", {}).get("display_name", "") for a in authorships]
