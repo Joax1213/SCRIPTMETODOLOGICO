@@ -3,10 +3,8 @@ import re
 import time
 import urllib.request
 import json
-import ssl
 import logging
 from collections import deque
-import pandas as pd
 import networkx as nx
 
 from .utils import parse_author_name, format_authors_list, get_fallback_year, get_ssl_context

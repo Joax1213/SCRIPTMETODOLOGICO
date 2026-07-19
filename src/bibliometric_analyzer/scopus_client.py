@@ -2,7 +2,6 @@ import urllib.request
 import urllib.parse
 import json
 import logging
-import ssl
 from .utils import parse_author_name, get_fallback_year, get_ssl_context
 
 logger = logging.getLogger("bibliometric_analyzer")
