@@ -526,11 +526,13 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
             
     axis_map, axes_info = auto_classify_axes(all_extracted_keywords)
     
-    # Asignar a cada nodo su eje temático y color
+    # Asignar a cada nodo su eje temático y color (L-6)
     for n_id, data in nodes.items():
         color_bg, eje_nombre = classify_node_by_keywords(data['Título'], axis_map, default_color="#BC6C25", default_axis="Tema General")
         data["EjeTematico"] = eje_nombre
         data["EjeColor"] = color_bg
+        data["eje_tematico"] = eje_nombre
+        data["eje_color"] = color_bg
 
     if output_md:
         write_markdown_knowledge_base_unified(nodes, valid_edges, G, failed_nodes, output_md)

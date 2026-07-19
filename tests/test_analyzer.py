@@ -262,10 +262,12 @@ class TestPopulatedMatrix(unittest.TestCase):
         self.assertEqual(len(df), 2)
         
         # Fila 1: Extraído exitosamente de TextoCompleto
+        self.assertEqual(df.iloc[0]["Especie / Variedad Vegetal"], "Vicia faba")
         self.assertEqual(df.iloc[0]["Concentración del Elicitor"], "100 uM")
         self.assertEqual(df.iloc[0]["Rendimiento del Metabolito Principal (mg/g)"], "2.45 mg/g")
         
-        # Fila 2: No aplica - el artículo no describe un ensayo de elicitación
+        # Fila 2: Especie se extrae igualmente, pero dosis y rendimiento se bloquean por el gate
+        self.assertEqual(df.iloc[1]["Especie / Variedad Vegetal"], "General faba")
         self.assertEqual(df.iloc[1]["Concentración del Elicitor"], "No aplica — el artículo no describe un ensayo de elicitación")
         self.assertEqual(df.iloc[1]["Rendimiento del Metabolito Principal (mg/g)"], "No aplica — el artículo no describe un ensayo de elicitación")
 

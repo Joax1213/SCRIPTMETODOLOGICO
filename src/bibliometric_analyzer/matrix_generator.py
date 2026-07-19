@@ -483,7 +483,9 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         for t_col in theme_cols:
             t_col_lower = t_col.lower()
             
-            if theme == "phytochemistry" and not is_phytochemistry_trial:
+            # L-1/L-2: Solo bloquear columnas de dosis, precursor y rendimiento
+            is_gate_col = any(w in t_col_lower for w in ["elicitor", "precursor", "concentración", "concentracion", "rendimiento", "yield"])
+            if theme == "phytochemistry" and not is_phytochemistry_trial and is_gate_col:
                 row[t_col] = "No aplica — el artículo no describe un ensayo de elicitación"
                 continue
                 
@@ -773,7 +775,7 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
     
     rows_themes = []
     for idx, (node_id, data) in enumerate(nodes.items(), 1):
-        eje = data.get("EjeTematico")
+        eje = data.get("eje_tematico") or data.get("EjeTematico")
         if not eje:
             from .visualizer import auto_classify_axes, classify_node_by_keywords
             all_titles_abstracts = [d.get("Título", "") + " " + d.get("Abstract", "") for d in nodes.values()]
