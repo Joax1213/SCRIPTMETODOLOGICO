@@ -56,8 +56,8 @@ def find_rscript_path():
         if matches:
             return matches[-1]
 
-    # 4. Fallback: confiar en el PATH
-    return "Rscript"
+    # 4. Fallback: No se pudo localizar Rscript en el sistema
+    return None
 
 def ensure_r_packages(rscript_path):
     logger.info("Verificando paquetes de R requeridos (bibliometrix, shiny, rmarkdown)...")
@@ -236,23 +236,12 @@ def convert_xlsx_to_scopus_csv(input_file):
             if authors_str == "Author A." and local_authors != "Author A.":
                 authors_str = local_authors
                 
-            if not scopus_data:
-                # Simular scopus_data usando la información del Excel local
-                scopus_data = {
-                    "dc:title": local_title,
-                    "dc:creator": local_authors,
-                    "prism:coverDate": local_year,
-                    "prism:publicationName": local_journal,
-                    "eid": f"2-s2.0-{idx+10000000}",
-                    "citedby-count": "0"
-                }
-                abstract = local_abstract
-            else:
+            row_data = None
+            if scopus_data:
                 abstract = get_scopus_abstract(scopus_data.get("eid", f"2-s2.0-{idx+10000000}"), scopus_key)
                 if not abstract or abstract == "Abstract no disponible.":
                     abstract = local_abstract
                     
-            if scopus_data:
                 title = scopus_data.get("dc:title", "Sin título")
                 # Si no se obtuvieron autores de OpenAlex, usar y formatear dc:creator de Scopus
                 if authors_str == "Author A.":
@@ -325,74 +314,131 @@ def convert_xlsx_to_scopus_csv(input_file):
                     "Source": "Scopus",
                     "EID": eid
                 }
-            else:
+            elif alex_data:
                 # Fallback a OpenAlex
-                if alex_data:
-                    title = alex_data.get("title", "Sin título")
-                    year = alex_data.get("publication_year", 2026)
-                    primary_loc = alex_data.get("primary_location")
-                    source_obj = primary_loc.get("source") if primary_loc else None
-                    journal = source_obj.get("display_name", "N/A") if source_obj else "N/A"
-                    
-                    abstract_index = alex_data.get("abstract_inverted_index")
-                    abstract = rebuild_abstract_inverted_index(abstract_index) if abstract_index else "Abstract no disponible."
-                    
-                    row_data = {
-                        "Authors": authors_str,
-                        "Author(s) ID": "12345",
-                        "Title": title,
-                        "Year": int(year) if str(year).isdigit() else 2026,
-                        "Source title": journal,
-                        "Volume": "1",
-                        "Issue": "1",
-                        "Art. No.": "",
-                        "Page start": "1",
-                        "Page end": "10",
-                        "Page count": "10",
-                        "Cited by": "0",
-                        "DOI": d,
-                        "Link": f"https://doi.org/{d}",
-                        "Affiliations": "Universidad Ricardo Palma, Lima, Peru",
-                        "Authors with affiliations": f"{authors_str}, Universidad Ricardo Palma, Lima, Peru",
-                        "Abstract": abstract,
-                        "Author Keywords": keywords_str,
-                        "Index Keywords": keywords_str,
-                        "Molecular Sequence Numbers": "",
-                        "Chemicals/CAS": "",
-                        "Tradenames": "",
-                        "Manufacturers": "",
-                        "Funding Details": "",
-                        "Funding Text 1": "",
-                        "Funding Text 2": "",
-                        "Funding Text 3": "",
-                        "Funding Text 4": "",
-                        "Funding Text 5": "",
-                        "Funding Text 6": "",
-                        "Funding Text 7": "",
-                        "Funding Text 8": "",
-                        "Funding Text 9": "",
-                        "Funding Text 10": "",
-                        "References": "Ref1, 2026, J. Bio.; Ref2, 2025, Bio.",
-                        "Correspondence Address": f"{authors_str}; Universidad Ricardo Palma, Lima, Peru",
-                        "Editors": "",
-                        "Publisher": "Publisher",
-                        "Sponsors": "",
-                        "Conference name": "",
-                        "Conference date": "",
-                        "Conference location": "",
-                        "Conference code": "",
-                        "ISSN": "1234-5678",
-                        "ISBN": "",
-                        "CODEN": "",
-                        "PubMed ID": "",
-                        "Language of Original Document": "English",
-                        "Abbreviated Source Title": "Bio.",
-                        "Document Type": "Article",
-                        "Publication Stage": "Final",
-                        "Open Access": "All Open Access",
-                        "Source": "Scopus",
-                        "EID": f"2-s2.0-{idx+10000000}"
-                    }
+                title = alex_data.get("title", "Sin título")
+                year = alex_data.get("publication_year", 2026)
+                primary_loc = alex_data.get("primary_location")
+                source_obj = primary_loc.get("source") if primary_loc else None
+                journal = source_obj.get("display_name", "N/A") if source_obj else "N/A"
+                
+                abstract_index = alex_data.get("abstract_inverted_index")
+                abstract = rebuild_abstract_inverted_index(abstract_index) if abstract_index else "Abstract no disponible."
+                
+                row_data = {
+                    "Authors": authors_str,
+                    "Author(s) ID": "12345",
+                    "Title": title,
+                    "Year": int(year) if str(year).isdigit() else 2026,
+                    "Source title": journal,
+                    "Volume": "1",
+                    "Issue": "1",
+                    "Art. No.": "",
+                    "Page start": "1",
+                    "Page end": "10",
+                    "Page count": "10",
+                    "Cited by": "0",
+                    "DOI": d,
+                    "Link": f"https://doi.org/{d}",
+                    "Affiliations": "Universidad Ricardo Palma, Lima, Peru",
+                    "Authors with affiliations": f"{authors_str}, Universidad Ricardo Palma, Lima, Peru",
+                    "Abstract": abstract,
+                    "Author Keywords": keywords_str,
+                    "Index Keywords": keywords_str,
+                    "Molecular Sequence Numbers": "",
+                    "Chemicals/CAS": "",
+                    "Tradenames": "",
+                    "Manufacturers": "",
+                    "Funding Details": "",
+                    "Funding Text 1": "",
+                    "Funding Text 2": "",
+                    "Funding Text 3": "",
+                    "Funding Text 4": "",
+                    "Funding Text 5": "",
+                    "Funding Text 6": "",
+                    "Funding Text 7": "",
+                    "Funding Text 8": "",
+                    "Funding Text 9": "",
+                    "Funding Text 10": "",
+                    "References": "Ref1, 2026, J. Bio.; Ref2, 2025, Bio.",
+                    "Correspondence Address": f"{authors_str}; Universidad Ricardo Palma, Lima, Peru",
+                    "Editors": "",
+                    "Publisher": "Publisher",
+                    "Sponsors": "",
+                    "Conference name": "",
+                    "Conference date": "",
+                    "Conference location": "",
+                    "Conference code": "",
+                    "ISSN": "1234-5678",
+                    "ISBN": "",
+                    "CODEN": "",
+                    "PubMed ID": "",
+                    "Language of Original Document": "English",
+                    "Abbreviated Source Title": "Bio.",
+                    "Document Type": "Article",
+                    "Publication Stage": "Final",
+                    "Open Access": "All Open Access",
+                    "Source": "Scopus",
+                    "EID": f"2-s2.0-{idx+10000000}"
+                }
+            else:
+                # Fallback offline al Excel local
+                row_data = {
+                    "Authors": authors_str,
+                    "Author(s) ID": "12345",
+                    "Title": local_title,
+                    "Year": int(local_year) if str(local_year).isdigit() else 2026,
+                    "Source title": local_journal,
+                    "Volume": "1",
+                    "Issue": "1",
+                    "Art. No.": "",
+                    "Page start": "1",
+                    "Page end": "10",
+                    "Page count": "10",
+                    "Cited by": "0",
+                    "DOI": d,
+                    "Link": f"https://doi.org/{d}",
+                    "Affiliations": "Universidad Ricardo Palma, Lima, Peru",
+                    "Authors with affiliations": f"{authors_str}, Universidad Ricardo Palma, Lima, Peru",
+                    "Abstract": local_abstract,
+                    "Author Keywords": keywords_str,
+                    "Index Keywords": keywords_str,
+                    "Molecular Sequence Numbers": "",
+                    "Chemicals/CAS": "",
+                    "Tradenames": "",
+                    "Manufacturers": "",
+                    "Funding Details": "",
+                    "Funding Text 1": "",
+                    "Funding Text 2": "",
+                    "Funding Text 3": "",
+                    "Funding Text 4": "",
+                    "Funding Text 5": "",
+                    "Funding Text 6": "",
+                    "Funding Text 7": "",
+                    "Funding Text 8": "",
+                    "Funding Text 9": "",
+                    "Funding Text 10": "",
+                    "References": "Ref1, 2026, J. Bio.; Ref2, 2025, Bio.",
+                    "Correspondence Address": f"{authors_str}; Universidad Ricardo Palma, Lima, Peru",
+                    "Editors": "",
+                    "Publisher": "Publisher",
+                    "Sponsors": "",
+                    "Conference name": "",
+                    "Conference date": "",
+                    "Conference location": "",
+                    "Conference code": "",
+                    "ISSN": "1234-5678",
+                    "ISBN": "",
+                    "CODEN": "",
+                    "PubMed ID": "",
+                    "Language of Original Document": "English",
+                    "Abbreviated Source Title": "Bio.",
+                    "Document Type": "Article",
+                    "Publication Stage": "Final",
+                    "Open Access": "All Open Access",
+                    "Source": "Scopus",
+                    "EID": f"2-s2.0-{idx+10000000}"
+                }
                     
             if row_data:
                 scopus_rows.append(row_data)
