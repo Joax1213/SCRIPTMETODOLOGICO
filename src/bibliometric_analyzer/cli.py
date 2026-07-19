@@ -334,6 +334,11 @@ def main():
                 if i < len(pubmed_results):
                     results.append(pubmed_results[i])
                     
+            # Normalizar resúmenes de OpenAlex reconstruyéndolos si es necesario
+            for r in results:
+                if "abstract_inverted_index" in r and not r.get("abstract"):
+                    r["abstract"] = rebuild_abstract_inverted_index(r.get("abstract_inverted_index")) or ""
+                    
             if not results:
                 logger.error("No se encontraron artículos semilla para el tema ingresado.")
                 sys.exit(1)
@@ -362,6 +367,11 @@ def main():
                         results_s.append(openalex_results_s[i])
                     if i < len(pubmed_results_s):
                         results_s.append(pubmed_results_s[i])
+                        
+                for r in results_s:
+                    if "abstract_inverted_index" in r and not r.get("abstract"):
+                        r["abstract"] = rebuild_abstract_inverted_index(r.get("abstract_inverted_index")) or ""
+                        
                 for r in results_s:
                     r_title = r.get("title", "")
                     r_year = r.get("year") or r.get("publication_year")
