@@ -204,7 +204,7 @@ def convert_xlsx_to_scopus_csv(input_file):
                     keywords_str = "; ".join(concepts_list)
 
             # Extraer metadatos locales desde el Excel de entrada como fallback offline
-            row_match = df[df[doi_col].astype(str).str.contains(d, na=False)]
+            row_match = df[df[doi_col].astype(str).str.contains(d, regex=False, na=False)]
             local_title = "Sin título"
             local_authors = "Author A."
             local_year = "2026"
