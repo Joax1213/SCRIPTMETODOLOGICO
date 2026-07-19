@@ -3,7 +3,6 @@ import re
 import json
 import logging
 from .utils import parse_author_name, get_ssl_context
-from .themes import CLUSTER_COLORS
 
 logger = logging.getLogger("bibliometric_analyzer")
 

@@ -135,7 +135,7 @@ def run_biblioshiny(rscript_path):
 def convert_xlsx_to_scopus_csv(input_file):
     import pandas as pd
     import tempfile
-    from .openalex_client import get_openalex_paper_data
+    from .openalex_client import get_openalex_paper_data, rebuild_abstract_inverted_index
     from .scopus_client import get_scopus_paper_data, get_scopus_abstract
     
     logger.info(f"Detectado archivo Excel personalizado de auditoría: {input_file}")
@@ -890,6 +890,7 @@ def run_r_native_analysis(rscript_path, input_file, output_html, output_md):
         return
         
     from .visualizer import write_html_network_visualization
+    from .lineage_engine import generate_heuristic_qualitative_data
         
     temp_csv = None
     if input_file.lower().endswith(".xlsx"):

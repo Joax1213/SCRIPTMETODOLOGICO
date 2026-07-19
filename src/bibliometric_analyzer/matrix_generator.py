@@ -374,9 +374,6 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         search_text_lower = search_text.lower()
         
         authors = data.get("Autores", "Desconocido")
-        _parts = authors.split(",") if "," in authors else authors.split()
-        first_author = _parts[0].strip() if _parts else "Desconocido"
-        author_year = f"{first_author} ({data.get('Año', 'N/A')})"
         
         row = {col: "" for col in cols}
         row["#"] = idx
