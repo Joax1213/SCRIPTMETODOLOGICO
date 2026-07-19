@@ -90,6 +90,14 @@ def get_citing_papers_openalex(doi, email, count=20, verify_ssl=True):
                     author_name = format_authors_list(authors_list)
                     
                     publication_year = str(work.get("publication_year", "N/A"))
+                    try:
+                        y = int(publication_year)
+                        import datetime
+                        if not (1900 <= y <= datetime.datetime.now().year):
+                            publication_year = str(get_fallback_year())
+                    except (ValueError, TypeError):
+                        publication_year = str(get_fallback_year())
+                        
                     primary_loc = work.get("primary_location") or {}
                     source = (primary_loc.get("source") or {}) if isinstance(primary_loc, dict) else {}
                     journal = source.get("display_name", "N/A") if isinstance(source, dict) else "N/A"

@@ -81,6 +81,52 @@ def format_authors_list(authors_list, max_authors=5):
     else:
         return ", ".join(parsed[:max_authors]) + " et al."
 
+
+def get_short_author(authors_str):
+    """
+    Retorna el apellido del primer autor. Si hay más de un autor,
+    agrega 'et al.'. Evita 'et al.' para autores únicos (L-9).
+    """
+    if not authors_str or authors_str == "Desconocido":
+        return "Desconocido"
+        
+    if "et al." in authors_str:
+        clean = authors_str.split("et al.")[0].strip()
+        parts = [p.strip() for p in clean.split(",") if p.strip()]
+        if parts:
+            first_author = parts[0]
+            # Si tiene coma interna en el nombre del primer autor, ej "Joaquín, J."
+            if " " in first_author:
+                first_author = first_author.split()[0]
+            return f"{first_author} et al."
+        return "Desconocido"
+        
+    parts = [p.strip() for p in authors_str.split(",") if p.strip()]
+    
+    # Reagrupar autores
+    authors = []
+    i = 0
+    while i < len(parts):
+        if i > 0 and (len(parts[i]) <= 3 and parts[i].endswith(".")):
+            authors[-1] = f"{authors[-1]}, {parts[i]}"
+        else:
+            authors.append(parts[i])
+        i += 1
+        
+    if not authors:
+        return "Desconocido"
+        
+    first_author = authors[0].split(",")[0].strip()
+    # Si tiene espacios, tomamos solo el apellido (primer token)
+    if " " in first_author:
+        first_author = first_author.split()[0]
+        
+    if len(authors) == 1:
+        return first_author
+    else:
+        return f"{first_author} et al."
+
+
 class JSONCache:
     """Clase para administrar la caché local de respuestas de APIs."""
     def __init__(self, cache_dir=None):

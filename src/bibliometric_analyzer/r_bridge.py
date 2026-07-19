@@ -458,7 +458,7 @@ def convert_xlsx_to_scopus_csv(input_file):
         logger.error(f"Error al convertir Excel a formato Scopus CSV: {e}")
         return None
 
-def run_r_report(rscript_path, input_file, output_html):
+def run_r_report(rscript_path, input_file, output_html, theme="general"):
     if not input_file or not output_html:
         logger.error("Error: Se requiere `--input` y `--output-html` para generar el reporte de R.")
         return
@@ -466,7 +466,7 @@ def run_r_report(rscript_path, input_file, output_html):
     from .matrix_generator import parse_quality_and_bias, generate_rqs_markdown
     
     # Extraer secciones de RQs y calidad de sesgo desde Python
-    quality_res = parse_quality_and_bias(input_file)
+    quality_res = parse_quality_and_bias(input_file, theme=theme)
     if isinstance(quality_res, tuple) and len(quality_res) == 2:
         quality_section, quality_stats = quality_res
     else:

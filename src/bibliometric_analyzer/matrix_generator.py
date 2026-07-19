@@ -225,7 +225,7 @@ def _is_positive(series, patterns):
     return series.str.lower().str.contains(combined, regex=True, na=False) & not_placeholder
 
 
-def parse_quality_and_bias(input_file):
+def parse_quality_and_bias(input_file, theme="general"):
     """Lee el Excel de auditoría y genera un bloque Markdown de calidad GRADE.
     Retorna (quality_markdown_str, quality_stats_dict) para que las RQs usen
     métricas reales del corpus.
@@ -246,16 +246,28 @@ def parse_quality_and_bias(input_file):
 
         df = pd.read_excel(input_file, sheet_name=sheet_name)
 
-        # Buscar columnas de calidad exactas o altamente específicas para evitar colisión con columnas del tema
-        col_sd   = [c for c in df.columns if "calidad del estudio" in c.lower()]
+        # Consultar el mapeo de columnas de calidad según el tema (L-5)
+        from .themes import get_quality_column_map
+        col_map = get_quality_column_map(theme)
+        q_col = col_map.get("quality", "Calidad del Estudio (Alta/Media/Baja)")
+        b_col = col_map.get("bias", "Riesgo de Sesgo")
+        e_col = col_map.get("evidence", "Nivel de Evidencia")
+
+        col_sd   = [c for c in df.columns if c.lower() == q_col.lower()]
+        if not col_sd:
+            col_sd = [c for c in df.columns if q_col.lower() in c.lower()]
         if not col_sd:
             col_sd = [c for c in df.columns if "sd" in c.lower() or "calidad" in c.lower()]
             
-        col_lod  = [c for c in df.columns if "riesgo de sesgo" in c.lower()]
+        col_lod  = [c for c in df.columns if c.lower() == b_col.lower()]
+        if not col_lod:
+            col_lod = [c for c in df.columns if b_col.lower() in c.lower()]
         if not col_lod:
             col_lod = [c for c in df.columns if "lod" in c.lower() or "sesgo" in c.lower()]
             
-        col_ctrl = [c for c in df.columns if c.lower() == "nivel de evidencia" or ("evidencia" in c.lower() and "grade" not in c.lower())]
+        col_ctrl = [c for c in df.columns if c.lower() == e_col.lower()]
+        if not col_ctrl:
+            col_ctrl = [c for c in df.columns if e_col.lower() in c.lower()]
         if not col_ctrl:
             col_ctrl = [c for c in df.columns if "control" in c.lower() or "réplic" in c.lower() or "evidencia" in c.lower()]
 
@@ -436,7 +448,21 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         row = {col: "" for col in cols}
         row["#"] = idx
         row["ID_OpenAlex"] = data.get("ID", "")
-        row["DOI"] = data.get("DOI", node_id)
+        
+        # Clean DOI and OpenAlex ID (L-4)
+        raw_doi = data.get("DOI", node_id) or ""
+        clean_doi = raw_doi
+        if "doi.org/" in raw_doi:
+            clean_doi = raw_doi.split("doi.org/")[-1].strip()
+            
+        if clean_doi.lower().startswith("10."):
+            row["DOI"] = clean_doi
+        else:
+            openalex_id = data.get("ID", "") or node_id or ""
+            if "openalex.org/" in openalex_id:
+                openalex_id = openalex_id.split("openalex.org/")[-1].strip()
+            row["DOI"] = f"Sin DOI (ID OpenAlex: {openalex_id})"
+            
         row["Título"] = title
         row["Autores"] = data.get("Autores", "Desconocido")
         row["Año"] = data.get("Año", "N/A")
@@ -445,9 +471,22 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
         row["Descubrimientos Principales"] = data.get("Descubrimientos Principales", "")
         row["Aporte al Tema"] = data.get("Aporte al Tema", "")
         
+        # Gate check para fitoquímica (L-2)
+        is_phytochemistry_trial = True
+        if theme == "phytochemistry":
+            elicitation_gate_regex = r'\b(elicited?|elicitation|eliciting|elicitor|treated\s+with|induced\s+by|supplemented\s+with|sprayed\s+with|precursor)\b'
+            text_to_check = title + " " + abstract
+            if not re.search(elicitation_gate_regex, text_to_check, re.IGNORECASE):
+                is_phytochemistry_trial = False
+
         used_sentences = set()
         for t_col in theme_cols:
             t_col_lower = t_col.lower()
+            
+            if theme == "phytochemistry" and not is_phytochemistry_trial:
+                row[t_col] = "No aplica — el artículo no describe un ensayo de elicitación"
+                continue
+                
             val = "No reportado"
 
             # ── Motor de extracción por tipo semántico de columna ──────────────────
@@ -458,12 +497,18 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                 if matches:
                     val = ", ".join(list(dict.fromkeys(matches))[:3])
 
-            # 2. Rendimiento / Yield
+            # 2. Rendimiento / Yield (L-3)
             elif any(w in t_col_lower for w in ["rendimiento", "yield", "recuperación", "output"]):
-                yield_pattern = r'(\d+(?:\.\d+)?(?:\s*(?:-|to|and|,\s*)\s*\d+(?:\.\d+)?)*\s*(?:mg/g|ug/g|g/kg|%|mg/100g))'
+                if "mg/g" in t_col_lower:
+                    yield_pattern = r'(\d+(?:\.\d+)?(?:\s*(?:-|to|and|,\s*)\s*\d+(?:\.\d+)?)*\s*(?:mg/g|mg/mL|μg/g|ug/g|g/kg|mg/100g))'
+                else:
+                    yield_pattern = r'(\d+(?:\.\d+)?(?:\s*(?:-|to|and|,\s*)\s*\d+(?:\.\d+)?)*\s*(?:mg/g|ug/g|g/kg|%|mg/100g))'
+                
                 matches = re.findall(yield_pattern, search_text, re.IGNORECASE)
                 if matches:
                     val = ", ".join(list(dict.fromkeys(matches))[:3])
+                elif "mg/g" in t_col_lower and "%" in search_text_lower:
+                    val = "Unidad no coincide (revisar texto completo)"
 
             # 3. Método / Técnica / Instrumento
             elif any(w in t_col_lower for w in ["método", "técnica", "instrumento", "metodología", "method", "technique", "instrument", "cuantificación", "extracción", "análisis"]):
@@ -492,9 +537,23 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                 else:
                     val = "Análisis Experimental"
 
-            # 4. Especie / Variedad / Matriz / Tipo de estudio
+            # 4. Especie / Variedad / Matriz / Tipo de estudio (L-1)
             elif any(w in t_col_lower for w in ["especie", "variedad", "matriz", "alimento", "producto", "establecimiento", "destino", "species", "matrix", "tipo de estudio", "diseño", "diseno"]):
-                if "vicia" in search_text_lower or "faba" in search_text_lower:
+                is_species_col = any(w in t_col_lower for w in ["especie", "variedad", "species", "vegetal"])
+                binomial_regex = r'\b([A-Z][a-z]+ [a-z]{3,}(?:\s+[A-Z][a-zA-Z]*\.)?)\b'
+                
+                match_species = None
+                m_title = re.search(binomial_regex, title)
+                if m_title:
+                    match_species = m_title.group(1).strip()
+                else:
+                    m_abs = re.search(binomial_regex, abstract)
+                    if m_abs:
+                        match_species = m_abs.group(1).strip()
+                
+                if match_species:
+                    val = match_species
+                elif "vicia" in search_text_lower or "faba" in search_text_lower:
                     val = "Vicia faba L."
                 elif "mucuna" in search_text_lower:
                     val = "Mucuna pruriens"
@@ -517,7 +576,7 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                 elif "wheat" in search_text_lower or "trigo" in search_text_lower:
                     val = "Matriz de Trigo"
                 else:
-                    val = "Modelo de Estudio"
+                    val = "No identificada" if is_species_col else "Modelo de Estudio"
 
             # 5. Resultados Estadísticos (OR / RR / HR / p-value) — columna específica de health_sciences
             elif any(w in t_col_lower for w in ["or/rr", "or/rr/hr", "p-value", "estadístico", "estadistico", "odds ratio", "hazard"]):
@@ -713,15 +772,17 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
     df_detail = pd.DataFrame(rows, columns=cols)
     
     rows_themes = []
-    from .visualizer import auto_classify_axes, classify_node_by_keywords
-    all_titles_abstracts = [data.get("Título", "") + " " + data.get("Abstract", "") for data in nodes.values()]
-    all_kws = []
-    for text in all_titles_abstracts:
-        all_kws.extend(re.findall(r'\b[a-z]{4,}\b', text.lower()))
-    axis_map, _ = auto_classify_axes(all_kws)
-    
     for idx, (node_id, data) in enumerate(nodes.items(), 1):
-        _, eje = classify_node_by_keywords(data.get("Título", ""), axis_map)
+        eje = data.get("EjeTematico")
+        if not eje:
+            from .visualizer import auto_classify_axes, classify_node_by_keywords
+            all_titles_abstracts = [d.get("Título", "") + " " + d.get("Abstract", "") for d in nodes.values()]
+            all_kws = []
+            for text in all_titles_abstracts:
+                all_kws.extend(re.findall(r'\b[a-z]{4,}\b', text.lower()))
+            axis_map, _ = auto_classify_axes(all_kws)
+            _, eje = classify_node_by_keywords(data.get("Título", ""), axis_map)
+            
         rows_themes.append({
             "#": idx,
             "DOI": data.get("DOI", node_id),

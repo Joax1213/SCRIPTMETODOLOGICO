@@ -7,7 +7,7 @@ import logging
 from collections import deque
 import networkx as nx
 
-from .utils import parse_author_name, format_authors_list, get_fallback_year, get_ssl_context
+from .utils import parse_author_name, format_authors_list, get_fallback_year, get_ssl_context, get_short_author
 from .scopus_client import get_scopus_paper_data, get_scopus_abstract, get_citing_papers_scopus
 from .openalex_client import get_openalex_paper_data, get_citing_papers_openalex, rebuild_abstract_inverted_index
 from .pubmed_client import get_pubmed_paper_data, get_citing_papers_pubmed
@@ -482,12 +482,62 @@ def execute_live_lineage(doi, output_html, output_md, api_source="all", scopus_k
             nodes[node_id]["PageRank"] = score
             nodes[node_id]["Centrality"] = degree_centrality[node_id]
 
+    # Calcular el clustering una sola vez para sincronizar Excel e HTML (L-6)
+    from .visualizer import auto_classify_axes, classify_node_by_keywords
+    from .themes import STOP_WORDS
+
+    all_extracted_keywords = []
+    
+    stop_words = set(STOP_WORDS) | {
+        "because", "including", "lour", "under", "about", "during", "after", "before", 
+        "without", "against", "among", "through", "between", "while", "where", "when", 
+        "which", "who", "whom", "whose", "why", "how", "what", "whether", "either", "neither",
+        "study", "analysis", "results", "effects", "effect", "conditions", "methods", "method",
+        "paper", "article", "journal", "research", "data", "significantly", "based", "different",
+        "well", "high", "low", "new", "content", "compounds", "production", "properties",
+        "increased", "expression", "extraction", "concentration", "yield", "significant",
+        "increase", "decrease", "higher", "lower", "acid", "activity", "levels", "level",
+        "samples", "sample", "treatment", "treatments", "time", "rate", "comparison",
+        "compared", "days", "hours", "parameters", "values", "value", "control", "controls",
+        "disponible", "abstract", "no", "si", "con", "para", "por", "del", "las", "los", "una",
+        "uno", "este", "esta", "estos", "estas", "como", "entre"
+    }
+    
+    for n_id, data in nodes.items():
+        abstract_text = data.get("Abstract") or ""
+        if "abstract no disponible" in abstract_text.lower():
+            abstract_text = ""
+        
+        # Filtro de abreviaturas taxonómicas (L-7)
+        text_original = (data.get("Título") or "") + " " + abstract_text
+        taxonomic_abbrevs = set(re.findall(r'\b[A-Z][A-Za-z]{0,3}\.', text_original))
+        taxonomic_clean = set(w.lower().rstrip('.') for w in taxonomic_abbrevs)
+        
+        text = text_original.lower()
+        text_clean = re.sub(r'[^a-z0-9\s-]', '', text)
+        words = set(w for w in text_clean.split() if len(w) > 3 and w not in stop_words and w not in taxonomic_clean)
+        
+        for comp in ["machine learning", "deep learning", "artificial intelligence", "climate change", "public health", "supply chain", "quality control", "human resources", "customer satisfaction", "food safety", "renewable energy", "social media", "big data", "case study", "systematic review"]:
+            if comp in text:
+                words.add(comp)
+                
+        for w in words:
+            all_extracted_keywords.append(w)
+            
+    axis_map, axes_info = auto_classify_axes(all_extracted_keywords)
+    
+    # Asignar a cada nodo su eje temático y color
+    for n_id, data in nodes.items():
+        color_bg, eje_nombre = classify_node_by_keywords(data['Título'], axis_map, default_color="#BC6C25", default_axis="Tema General")
+        data["EjeTematico"] = eje_nombre
+        data["EjeColor"] = color_bg
+
     if output_md:
         write_markdown_knowledge_base_unified(nodes, valid_edges, G, failed_nodes, output_md)
         
     if output_html:
         from .visualizer import write_html_network_visualization
-        write_html_network_visualization(nodes, valid_edges, output_html, verify_ssl=verify_ssl, theme_name=theme)
+        write_html_network_visualization(nodes, valid_edges, output_html, verify_ssl=verify_ssl, theme_name=theme, axis_map=axis_map, axes_info=axes_info)
         
     return nodes, valid_edges
 
@@ -519,7 +569,7 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
     md.append("\n*   **Top 10 de Autoridades Científicas (PageRank & Centralidad):**")
     
     for idx, auth in enumerate(top_authorities):
-        autores_corto = auth['Autores'].split(',')[0] if ',' in auth['Autores'] else auth['Autores']
+        autores_corto = get_short_author(auth['Autores'])
         md.append(f"    {idx+1}. **{autores_corto} ({auth['Año']})** - PageRank: {auth.get('PageRank', 0):.4f} - Centralidad: {auth.get('Centrality', 0):.4f} · *{auth['Revista']}*")
     
     md.append("\n## 2. Reporte de Incidentes de Extracción")
@@ -536,7 +586,7 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
     md.append("## 3. Mapa de Conexiones Dirigidas (El Linaje de Citas)")
     
     for n_id, n_data in nodes.items():
-        citation_key = f"{n_data['Autores'].split(',')[0] if ',' in n_data['Autores'] else n_data['Autores']} ({n_data['Año']})"
+        citation_key = f"{get_short_author(n_data['Autores'])} ({n_data['Año']})"
         md.append(f"### [{n_id}] {citation_key} · *{n_data['Revista']}*")
         md.append(f"*   **Título:** {n_data['Título']}")
         md.append(f"*   **DOI:** [https://doi.org/{n_id}](https://doi.org/{n_id})")
@@ -551,7 +601,7 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
             for anc in ancestros:
                 anc_data = nodes.get(anc)
                 if anc_data:
-                    anc_key = f"{anc_data['Autores'].split(',')[0] if ',' in anc_data['Autores'] else anc_data['Autores']} ({anc_data['Año']})"
+                    anc_key = f"{get_short_author(anc_data['Autores'])} ({anc_data['Año']})"
                     md.append(f"    - [{anc}](https://doi.org/{anc}) {anc_key}")
                 else:
                     md.append(f"    - [{anc}](https://doi.org/{anc}) DOI Externo")
@@ -564,7 +614,7 @@ def write_markdown_knowledge_base_unified(nodes, edges, G, failed_nodes, path):
             for desc in descendientes:
                 desc_data = nodes.get(desc)
                 if desc_data:
-                    desc_key = f"{desc_data['Autores'].split(',')[0] if ',' in desc_data['Autores'] else desc_data['Autores']} ({desc_data['Año']})"
+                    desc_key = f"{get_short_author(desc_data['Autores'])} ({desc_data['Año']})"
                     md.append(f"    - [{desc}](https://doi.org/{desc}) {desc_key}")
                 else:
                     md.append(f"    - [{desc}](https://doi.org/{desc}) DOI Externo")

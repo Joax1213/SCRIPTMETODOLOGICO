@@ -235,6 +235,18 @@ def main():
 
     setup_logging(verbose=args.verbose)
 
+    # Validación de rango de años (L-8)
+    import datetime
+    current_year = datetime.datetime.now().year
+    if args.start_year is not None:
+        if not (1900 <= args.start_year <= current_year):
+            logger.warning(f"Advertencia: El año de inicio ({args.start_year}) está fuera de rango lógico (1900-{current_year}). Se utilizará 1900 como valor por defecto.")
+            args.start_year = 1900
+    if args.end_year is not None:
+        if not (1900 <= args.end_year <= current_year):
+            logger.warning(f"Advertencia: El año de fin ({args.end_year}) está fuera de rango lógico (1900-{current_year}). Se utilizará {current_year} como valor por defecto.")
+            args.end_year = current_year
+
     scopus_key = os.environ.get("SCOPUS_API_KEY", "")
     pubmed_key = os.environ.get("NCBI_API_KEY") or os.environ.get("PUBMED_API_KEY") or ""
     contact_email = os.environ.get("CONTACT_EMAIL", "")
@@ -297,7 +309,7 @@ def main():
             logger.error("Error: Rscript no encontrado en el sistema. Instale R y añádalo al PATH para generar reportes en R.")
             sys.exit(1)
         ensure_r_packages(rscript_path)
-        run_r_report(rscript_path, args.input, args.output_html)
+        run_r_report(rscript_path, args.input, args.output_html, theme=args.theme)
         sys.exit(0)
 
     if args.r_native:
@@ -472,7 +484,7 @@ def main():
             run_r_native_analysis(rscript_path, matrix_path, r_cooccur_html, r_biblio_md)
             
             logger.info("\n[Etapa 5/5] Compilando reporte R Markdown...")
-            run_r_report(rscript_path, matrix_path, r_report_html)
+            run_r_report(rscript_path, matrix_path, r_report_html, theme=args.theme)
             
             logger.info("\n" + "=" * 60)
             logger.info("   ¡PIPELINE AUTOMATIZADO FINALIZADO CON ÉXITO!")

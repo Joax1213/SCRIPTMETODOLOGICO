@@ -238,7 +238,7 @@ class TestPopulatedMatrix(unittest.TestCase):
                 "Autores": "Etemadi F.",
                 "Año": "2018",
                 "Revista": "Crop Journal",
-                "Abstract": "This study optimized L-DOPA yield under MeJA stress.",
+                "Abstract": "This study optimized L-DOPA yield under MeJA elicitor stress.",
                 "TextoCompleto": "The optimized conditions were 2.45 mg/g L-DOPA with 100 uM MeJA.",
                 "qualitative_desc": "Estudio descriptivo.",
                 "qualitative_app": "Aporte cuantitativo."
@@ -265,9 +265,9 @@ class TestPopulatedMatrix(unittest.TestCase):
         self.assertEqual(df.iloc[0]["Concentración del Elicitor"], "100 uM")
         self.assertEqual(df.iloc[0]["Rendimiento del Metabolito Principal (mg/g)"], "2.45 mg/g")
         
-        # Fila 2: No reportado
-        self.assertEqual(df.iloc[1]["Concentración del Elicitor"], "No reportado")
-        self.assertEqual(df.iloc[1]["Rendimiento del Metabolito Principal (mg/g)"], "No reportado")
+        # Fila 2: No aplica - el artículo no describe un ensayo de elicitación
+        self.assertEqual(df.iloc[1]["Concentración del Elicitor"], "No aplica — el artículo no describe un ensayo de elicitación")
+        self.assertEqual(df.iloc[1]["Rendimiento del Metabolito Principal (mg/g)"], "No aplica — el artículo no describe un ensayo de elicitación")
 
     def test_quality_parsing_and_rqs_calculation(self):
         from bibliometric_analyzer.matrix_generator import generate_populated_matrix, parse_quality_and_bias, generate_rqs_markdown
@@ -296,7 +296,7 @@ class TestPopulatedMatrix(unittest.TestCase):
         self.assertTrue(os.path.exists(self.output_path))
         
         # Test parse_quality_and_bias
-        quality_summary, stats = parse_quality_and_bias(self.output_path)
+        quality_summary, stats = parse_quality_and_bias(self.output_path, theme="health_sciences")
         self.assertIsNotNone(quality_summary)
         self.assertEqual(stats["total_papers"], 2)
         # Gomez R: Calidad Alta (1), Sesgo Bajo (1), Evidencia Fuerte (1) -> score 3/3

@@ -2,7 +2,7 @@ import os
 import re
 import json
 import logging
-from .utils import parse_author_name, get_ssl_context
+from .utils import parse_author_name, get_ssl_context, get_short_author
 
 logger = logging.getLogger("bibliometric_analyzer")
 
@@ -83,7 +83,7 @@ def classify_node_by_keywords(title, axis_map, default_color="#888888", default_
         return best_match["color"], best_match["axis"]
     return default_color, default_axis
 
-def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, keywords_edges=None, verify_ssl=True, theme_name="general"):
+def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, keywords_edges=None, verify_ssl=True, theme_name="general", axis_map=None, axes_info=None):
     logger.info(f"[HTML] Generando visor interactivo HTML en: {path}")
     
     output_dir = os.path.dirname(path) if path else os.getcwd()
@@ -118,12 +118,23 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
             logger.warning(f"[HTML] Advertencia: No se pudo descargar plotly.min.js: {e}")
             logger.warning("[HTML] Fallback: El visor HTML usará CDN remoto (cdn.plot.ly) — requiere conexión a internet para funcionar.")
             
+    from .themes import STOP_WORDS
+
     all_extracted_keywords = []
     
-    stop_words = {
-        "the", "and", "a", "of", "in", "to", "for", "with", "as", "by", "on", "at", "an", "is", "from", "that", "this", "are", "was", "were", "be", "or", "which", "between", "their", "its", "both", "more", "also", "after", "during", "some", "other", "about", "into", "than", "then", "them", "they", "we", "our", "us", "you", "your",
-        "have", "has", "had", "been", "do", "does", "did", "can", "could", "would", "should", "will", "may", "might", "must", "used", "using", "showed", "shown", "found", "observed", "determined", "suggests", "reported", "concluded", "investigated", "evaluated", "compared", "performed", "conducted", "obtained", "presented", "described",
-        "study", "analysis", "results", "effects", "effect", "conditions", "methods", "method", "paper", "article", "journal", "research", "data", "significantly", "based", "different", "well", "high", "low", "new", "content", "compounds", "production", "properties", "increased", "expression", "extraction", "concentration", "yield", "significant", "increase", "decrease", "higher", "lower", "acid", "activity", "levels", "level", "samples", "sample", "treatment", "treatments", "time", "rate", "comparison", "compared", "days", "hours", "parameters", "values", "value", "control", "controls", "conditions", "however", "therefore", "furthermore", "moreover", "although", "disponible", "abstract", "no", "si", "con", "para", "por", "del", "las", "los", "una", "uno", "este", "esta", "estos", "estas", "como", "entre", "under"
+    stop_words = set(STOP_WORDS) | {
+        "because", "including", "lour", "under", "about", "during", "after", "before", 
+        "without", "against", "among", "through", "between", "while", "where", "when", 
+        "which", "who", "whom", "whose", "why", "how", "what", "whether", "either", "neither",
+        "study", "analysis", "results", "effects", "effect", "conditions", "methods", "method",
+        "paper", "article", "journal", "research", "data", "significantly", "based", "different",
+        "well", "high", "low", "new", "content", "compounds", "production", "properties",
+        "increased", "expression", "extraction", "concentration", "yield", "significant",
+        "increase", "decrease", "higher", "lower", "acid", "activity", "levels", "level",
+        "samples", "sample", "treatment", "treatments", "time", "rate", "comparison",
+        "compared", "days", "hours", "parameters", "values", "value", "control", "controls",
+        "disponible", "abstract", "no", "si", "con", "para", "por", "del", "las", "los", "una",
+        "uno", "este", "esta", "estos", "estas", "como", "entre"
     }
     
     word_doc_mapping = {}
@@ -131,9 +142,15 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
         abstract_text = data.get("Abstract") or ""
         if "abstract no disponible" in abstract_text.lower():
             abstract_text = ""
-        text = ((data.get("Título") or "") + " " + abstract_text).lower()
+        
+        # Filtro de abreviaturas taxonómicas (L-7)
+        text_original = (data.get("Título") or "") + " " + abstract_text
+        taxonomic_abbrevs = set(re.findall(r'\b[A-Z][A-Za-z]{0,3}\.', text_original))
+        taxonomic_clean = set(w.lower().rstrip('.') for w in taxonomic_abbrevs)
+        
+        text = text_original.lower()
         text_clean = re.sub(r'[^a-z0-9\s-]', '', text)
-        words = set(w for w in text_clean.split() if len(w) > 3 and w not in stop_words)
+        words = set(w for w in text_clean.split() if len(w) > 3 and w not in stop_words and w not in taxonomic_clean)
         
         for comp in ["machine learning", "deep learning", "artificial intelligence", "climate change", "public health", "supply chain", "quality control", "human resources", "customer satisfaction", "food safety", "renewable energy", "social media", "big data", "case study", "systematic review"]:
             if comp in text:
@@ -145,7 +162,8 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
             word_doc_mapping[w].add(n_id)
             all_extracted_keywords.append(w)
             
-    axis_map, axes_info = auto_classify_axes(all_extracted_keywords)
+    if axis_map is None or axes_info is None:
+        axis_map, axes_info = auto_classify_axes(all_extracted_keywords)
     
     if not keywords_nodes:
         frequent_words = {w: docs for w, docs in word_doc_mapping.items() if len(docs) >= 2}
@@ -170,7 +188,7 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
             for d_id in docs_list[:5]:
                 d_data = nodes.get(d_id)
                 if d_data:
-                    author_short = parse_author_name(d_data['Autores']).split(',')[0]
+                    author_short = get_short_author(d_data['Autores'])
                     linked_docs.append({
                         "doi": d_id,
                         "label": f"{author_short} ({d_data['Año']})",
@@ -231,7 +249,10 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
         pr = data.get("PageRank", 0.05)
         size = 15 + (pr * 380)
         
-        color_bg, eje_nombre = classify_node_by_keywords(data['Título'], axis_map, default_color="#BC6C25", default_axis="Tema General")
+        color_bg = data.get("EjeColor")
+        eje_nombre = data.get("EjeTematico")
+        if not color_bg or not eje_nombre:
+            color_bg, eje_nombre = classify_node_by_keywords(data['Título'], axis_map, default_color="#BC6C25", default_axis="Tema General")
         color_border = "#333333"
         font_color = "#FFFFFF"
         
@@ -239,12 +260,12 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
         if is_authority:
             border_width = 4
             color_border_highlight = "#D90429"
-            label = f"★ {data['Autores'].split(',')[0].upper()} ({data['Año']})"
+            label = f"★ {get_short_author(data['Autores']).upper()} ({data['Año']})"
             shadow_opt = {"enabled": True, "color": "rgba(217,4,41,0.5)", "size": 10, "x": 0, "y": 0}
         else:
             border_width = 1.5
             color_border_highlight = color_border
-            label = f"{data['Autores'].split(',')[0]} ({data['Año']})"
+            label = f"{get_short_author(data['Autores'])} ({data['Año']})"
             shadow_opt = {"enabled": True, "color": "rgba(0,0,0,0.15)", "size": 5, "x": 1, "y": 1}
             
         color_opt = {
@@ -257,14 +278,14 @@ def write_html_network_visualization(nodes, edges, path, keywords_nodes=None, ke
         for anc_id in ancestors_map.get(n_id, []):
             anc_data = nodes.get(anc_id)
             if anc_data:
-                anc_author = anc_data['Autores'].split(',')[0] if ',' in anc_data['Autores'] else anc_data['Autores']
+                anc_author = get_short_author(anc_data['Autores'])
                 anc_list.append({"id": anc_id, "label": f"{anc_author} ({anc_data['Año']})", "title": anc_data['Título']})
                 
         desc_list = []
         for desc_id in descendants_map.get(n_id, []):
             desc_data = nodes.get(desc_id)
             if desc_data:
-                desc_author = desc_data['Autores'].split(',')[0] if ',' in desc_data['Autores'] else desc_data['Autores']
+                desc_author = get_short_author(desc_data['Autores'])
                 desc_list.append({"id": desc_id, "label": f"{desc_author} ({desc_data['Año']})", "title": desc_data['Título']})
 
         title_tooltip = (

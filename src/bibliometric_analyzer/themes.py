@@ -547,6 +547,16 @@ def get_theme_columns(theme_name):
     return BASE_COLUMNS + theme["matrix_columns"] + QUALITY_COLUMNS
 
 
+def get_quality_column_map(theme_name):
+    """Retorna el mapa de columnas de calidad por tema (L-5)."""
+    theme = get_theme(theme_name)
+    return theme.get("quality_column_map", {
+        "quality": "Calidad del Estudio (Alta/Media/Baja)",
+        "bias": "Riesgo de Sesgo",
+        "evidence": "Nivel de Evidencia"
+    })
+
+
 def generate_qualitative_for_theme(theme_name, title, abstract):
     """Genera descubrimientos y aportes usando la función del tema."""
     theme = get_theme(theme_name)

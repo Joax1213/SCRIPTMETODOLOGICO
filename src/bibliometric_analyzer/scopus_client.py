@@ -129,6 +129,15 @@ def get_citing_papers_scopus(doi, title, api_key, verbose=False, verify_ssl=True
                     cover_date = entry.get("prism:coverDate")
                     cover_date_str = str(cover_date) if cover_date else ""
                     publication_year = cover_date_str.split("-")[0] if "-" in cover_date_str else str(get_fallback_year())
+                    
+                    try:
+                        y = int(publication_year)
+                        import datetime
+                        if not (1900 <= y <= datetime.datetime.now().year):
+                            publication_year = str(get_fallback_year())
+                    except (ValueError, TypeError):
+                        publication_year = str(get_fallback_year())
+                        
                     journal = entry.get("prism:publicationName", "N/A")
                     
                     eid = entry.get("eid")

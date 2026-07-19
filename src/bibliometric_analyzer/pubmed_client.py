@@ -112,6 +112,13 @@ def get_pubmed_paper_data(pmid_or_doi, api_key=None, verify_ssl=True):
         pub_date_str = str(pub_date) if pub_date else ""
         year_match = re.search(r'\b(19|20)\d{2}\b', pub_date_str)
         year = year_match.group(0) if year_match else str(get_fallback_year())
+        try:
+            y = int(year)
+            import datetime
+            if not (1900 <= y <= datetime.datetime.now().year):
+                year = str(get_fallback_year())
+        except (ValueError, TypeError):
+            year = str(get_fallback_year())
         
         journal = summary.get("source", "N/A")
         
@@ -205,6 +212,13 @@ def get_citing_papers_pubmed(doi_or_pmid, api_key=None, count=20, verify_ssl=Tru
                 pub_date_str = str(pub_date) if pub_date else ""
                 year_match = re.search(r'\b(19|20)\d{2}\b', pub_date_str)
                 year = year_match.group(0) if year_match else str(get_fallback_year())
+                try:
+                    y = int(year)
+                    import datetime
+                    if not (1900 <= y <= datetime.datetime.now().year):
+                        year = str(get_fallback_year())
+                except (ValueError, TypeError):
+                    year = str(get_fallback_year())
                 
                 journal = summary.get("source", "N/A")
                 
