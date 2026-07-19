@@ -11,6 +11,29 @@ import logging
 logger = logging.getLogger("bibliometric_analyzer")
 
 # ─────────────────────────────────────────────────────────
+#  Stopwords compartidas (usadas en extracción de términos
+#  y en la clasificación de clusters de visualizer.py)
+# ─────────────────────────────────────────────────────────
+STOP_WORDS = {
+    "the", "a", "an", "of", "in", "for", "and", "or", "to", "on", "at",
+    "by", "with", "from", "is", "are", "was", "were", "this", "that",
+    "these", "those", "it", "its", "be", "been", "being", "have", "has",
+    "had", "do", "does", "did", "will", "would", "could", "should",
+    "may", "might", "can", "shall", "not", "no", "nor", "but", "if",
+    "than", "then", "so", "as", "such", "both", "each", "all", "any",
+    "few", "more", "most", "other", "some", "only", "own", "same",
+    "too", "very", "just", "about", "above", "after", "again", "against",
+    "between", "into", "through", "during", "before", "under", "over",
+    "el", "la", "los", "las", "de", "del", "en", "con", "por", "para",
+    "un", "una", "es", "son", "se", "su", "al", "que", "como", "más",
+    "pero", "sin", "sobre", "entre", "durante", "desde", "hasta",
+    "study", "research", "analysis", "results", "effect", "effects",
+    "using", "based", "used", "method", "approach", "paper", "article",
+    "however", "also", "well", "two", "three", "new", "different",
+    "abstract", "disponible", "nan", "none",
+}
+
+# ─────────────────────────────────────────────────────────
 #  Paleta de colores genérica para clusters (8 colores)
 # ─────────────────────────────────────────────────────────
 CLUSTER_COLORS = [
@@ -47,29 +70,11 @@ QUALITY_COLUMNS = [
 # ─────────────────────────────────────────────────────────
 def _extract_key_terms(title, abstract, n=5):
     """Extrae los n términos más relevantes (no stopwords) del título + abstract."""
-    stopwords = {
-        "the", "a", "an", "of", "in", "for", "and", "or", "to", "on", "at",
-        "by", "with", "from", "is", "are", "was", "were", "this", "that",
-        "these", "those", "it", "its", "be", "been", "being", "have", "has",
-        "had", "do", "does", "did", "will", "would", "could", "should",
-        "may", "might", "can", "shall", "not", "no", "nor", "but", "if",
-        "than", "then", "so", "as", "such", "both", "each", "all", "any",
-        "few", "more", "most", "other", "some", "only", "own", "same",
-        "too", "very", "just", "about", "above", "after", "again", "against",
-        "between", "into", "through", "during", "before", "under", "over",
-        "el", "la", "los", "las", "de", "del", "en", "con", "por", "para",
-        "un", "una", "es", "son", "se", "su", "al", "que", "como", "más",
-        "pero", "sin", "sobre", "entre", "durante", "desde", "hasta",
-        "study", "research", "analysis", "results", "effect", "effects",
-        "using", "based", "used", "method", "approach", "paper", "article",
-        "however", "also", "well", "two", "three", "new", "different",
-        "abstract", "disponible", "nan", "none",
-    }
     text = f"{title} {abstract}".lower()
     words = re.findall(r'\b[a-záéíóúñü]{4,}\b', text)
     freq = {}
     for w in words:
-        if w not in stopwords:
+        if w not in STOP_WORDS:
             freq[w] = freq.get(w, 0) + 1
     sorted_terms = sorted(freq.items(), key=lambda x: -x[1])
     return [t[0] for t in sorted_terms[:n]]
@@ -99,20 +104,22 @@ def _generic_qualitative(title, abstract, discipline_hint=""):
     # Intentar extraer hallazgos del abstract
     abstract_lower = abstract.lower()
     
-    # Buscar patrones de resultados — captura hasta fin de oración o 150 chars, luego trunca en palabra
+    # Buscar patrones de resultados.
+    # Usa lookahead negativo (?!\. +[A-Z]) para NO cortar en puntos decimales
+    # (p=0.003, OR=2.4, F1=0.89) — solo corta en fin de oración real.
     result_patterns = [
-        r'(?:results?\s+(?:show|indicate|demonstrate|reveal|suggest|confirm))\s+([^.]{30,150})',
-        r'(?:findings?\s+(?:show|indicate|demonstrate|reveal|suggest))\s+([^.]{30,150})',
-        r'(?:we\s+(?:found|observed|demonstrated|showed))\s+([^.]{30,150})',
-        r'(?:se\s+(?:encontró|observó|demostró|evidenció))\s+([^.]{30,150})',
-        r'(?:los\s+resultados\s+(?:muestran|indican|demuestran|revelan))\s+([^.]{30,150})',
+        r'(?:results?\s+(?:show|indicate|demonstrate|reveal|suggest|confirm))\s+((?:(?!\.\s+[A-Z]).){30,200})',
+        r'(?:findings?\s+(?:show|indicate|demonstrate|reveal|suggest))\s+((?:(?!\.\s+[A-Z]).){30,200})',
+        r'(?:we\s+(?:found|observed|demonstrated|showed))\s+((?:(?!\.\s+[A-Z]).){30,200})',
+        r'(?:se\s+(?:encontró|observó|demostró|evidenció))\s+((?:(?!\.\s+[A-Z]).){30,200})',
+        r'(?:los\s+resultados\s+(?:muestran|indican|demuestran|revelan))\s+((?:(?!\.\s+[A-Z]).){30,200})',
     ]
-    
+
     finding = None
     for pattern in result_patterns:
         match = re.search(pattern, abstract_lower)
         if match:
-            # Truncar en límite de palabra, no de carácter
+            # _truncate_words respeta límite de palabra, no de carácter
             finding = _truncate_words(match.group(1).strip().rstrip('.'), max_chars=120)
             break
     

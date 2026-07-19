@@ -270,6 +270,46 @@ class TestPopulatedMatrix(unittest.TestCase):
         self.assertEqual(df.iloc[1]["Concentración del Elicitor"], "No reportado")
         self.assertEqual(df.iloc[1]["Rendimiento del Metabolito Principal (mg/g)"], "No reportado")
 
+    def test_quality_parsing_and_rqs_calculation(self):
+        from bibliometric_analyzer.matrix_generator import generate_populated_matrix, parse_quality_and_bias, generate_rqs_markdown
+        mock_nodes = {
+            "node1": {
+                "DOI": "10.1001/node1",
+                "Título": "Effects of Metformin on Clinical Outcomes",
+                "Autores": "Gomez R.",
+                "Año": "2022",
+                "Revista": "JAMA",
+                # Contiene palabras clave que infieren: Calidad Alta, Sesgo Bajo, Evidencia Fuerte
+                "Abstract": "The results show that metformin significantly reduced mortality with p=0.003 and OR=2.4. Statistical analysis was strong and bias was low with high evidence. Double-blind randomized trial.",
+                "TextoCompleto": "",
+            },
+            "node2": {
+                "DOI": "10.1002/node2",
+                "Título": "Roasting faba bean process review",
+                "Autores": "Revisar en texto completo",
+                "Año": "2020",
+                "Revista": "Food Sci",
+                "Abstract": "This abstract is missing.",
+                "TextoCompleto": "",
+            }
+        }
+        generate_populated_matrix(mock_nodes, self.output_path, theme="health_sciences")
+        self.assertTrue(os.path.exists(self.output_path))
+        
+        # Test parse_quality_and_bias
+        quality_summary, stats = parse_quality_and_bias(self.output_path)
+        self.assertIsNotNone(quality_summary)
+        self.assertEqual(stats["total_papers"], 2)
+        # Gomez R: Calidad Alta (1), Sesgo Bajo (1), Evidencia Fuerte (1) -> score 3/3
+        # node2: Por revisar (0), Por revisar (0), Limitado (0) -> score 0/3
+        self.assertEqual(stats["strong_si"], 1)
+        self.assertEqual(stats["weak_si"], 1)
+        
+        # Test generate_rqs_markdown con stats
+        rqs_md = generate_rqs_markdown(self.output_path, stats)
+        self.assertIn("promedio de rigor metodológico es **1.50/3.00**", rqs_md)
+        self.assertIn("1 artículos (50.0%)** con score GRADE = 3/3", rqs_md)
+
     def tearDown(self):
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)

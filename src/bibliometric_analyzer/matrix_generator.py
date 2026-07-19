@@ -148,11 +148,31 @@ def run_interactive_prisma_flow(output_path=None):
         logger.error(f"Error al ejecutar el flujo interactivo de PRISMA: {e}")
 
 
+# — Placeholders que no cuentan como valores positivos de calidad —
+_QUALITY_PLACEHOLDERS = frozenset({
+    "no reportado", "revisar en texto completo", "por revisar",
+    "n/a", "nan", "", "none", "not available",
+})
+
+
+def _is_positive(series, patterns):
+    """True si el valor contiene alguno de los patrones con límite de palabra
+    Y no es un placeholder que inflaría artificialmente el conteo de calidad.
+    """
+    combined = r'\b(?:' + '|'.join(re.escape(p) for p in patterns) + r')\b'
+    not_placeholder = ~series.str.strip().str.lower().isin(_QUALITY_PLACEHOLDERS)
+    return series.str.lower().str.contains(combined, regex=True, na=False) & not_placeholder
+
+
 def parse_quality_and_bias(input_file):
+    """Lee el Excel de auditoría y genera un bloque Markdown de calidad GRADE.
+    Retorna (quality_markdown_str, quality_stats_dict) para que las RQs usen
+    métricas reales del corpus.
+    """
     bias_data = []
-    if not input_file or not input_file.lower().endswith(".xlsx"):
-        return None
-        
+    if not input_file or not os.path.exists(input_file):
+        return None, {}
+
     try:
         xl = pd.ExcelFile(input_file)
         sheet_name = None
@@ -162,32 +182,45 @@ def parse_quality_and_bias(input_file):
                 break
         if not sheet_name:
             sheet_name = xl.sheet_names[0]
-            
+
         df = pd.read_excel(input_file, sheet_name=sheet_name)
-        
-        col_sd = [c for c in df.columns if "sd" in c.lower() or "estad" in c.lower() or "calidad" in c.lower()]
-        col_lod = [c for c in df.columns if "lod" in c.lower() or "límite" in c.lower() or "sesgo" in c.lower()]
-        col_ctrl = [c for c in df.columns if "control" in c.lower() or "réplic" in c.lower() or "evidencia" in c.lower()]
-        
+
+        # Buscar columnas de calidad exactas o altamente específicas para evitar colisión con columnas del tema
+        col_sd   = [c for c in df.columns if "calidad del estudio" in c.lower()]
+        if not col_sd:
+            col_sd = [c for c in df.columns if "sd" in c.lower() or "calidad" in c.lower()]
+            
+        col_lod  = [c for c in df.columns if "riesgo de sesgo" in c.lower()]
+        if not col_lod:
+            col_lod = [c for c in df.columns if "lod" in c.lower() or "sesgo" in c.lower()]
+            
+        col_ctrl = [c for c in df.columns if c.lower() == "nivel de evidencia" or ("evidencia" in c.lower() and "grade" not in c.lower())]
+        if not col_ctrl:
+            col_ctrl = [c for c in df.columns if "control" in c.lower() or "réplic" in c.lower() or "evidencia" in c.lower()]
+
         if col_sd and col_lod and col_ctrl:
-            c_sd = col_sd[0]
-            c_lod = col_lod[0]
-            c_ctrl = col_ctrl[0]
-            
+            c_sd, c_lod, c_ctrl = col_sd[0], col_lod[0], col_ctrl[0]
+
+            # Patrones con límite de palabra: ya no hace match de la letra “s” suelta
+            sd_patterns   = ["sí", "alta", "fuerte", "alto", "strong", "high", "yes"]
+            lod_patterns  = ["sí", "bajo", "baja", "low", "none", "yes"]
+            ctrl_patterns = ["sí", "alta", "fuerte", "moderada", "moderate", "high", "yes"]
+
             total_papers = len(df)
-            sd_si = df[c_sd].astype(str).str.lower().str.contains("s|alta|fuerte").sum()
-            lod_si = df[c_lod].astype(str).str.lower().str.contains("s|bajo|baja").sum()
-            ctrl_si = df[c_ctrl].astype(str).str.lower().str.contains("s|alta|fuerte|moderada").sum()
-            
-            df['score'] = 0
-            df.loc[df[c_sd].astype(str).str.lower().str.contains("s|alta|fuerte"), 'score'] += 1
-            df.loc[df[c_lod].astype(str).str.lower().str.contains("s|bajo|baja|no"), 'score'] += 1
-            df.loc[df[c_ctrl].astype(str).str.lower().str.contains("s|alta|fuerte|moderada"), 'score'] += 1
-            
-            score_avg = df['score'].mean()
-            strong_si = (df['score'] == 3).sum()
-            weak_si = (df['score'] <= 1).sum()
-            
+            sd_mask   = _is_positive(df[c_sd].astype(str),   sd_patterns)
+            lod_mask  = _is_positive(df[c_lod].astype(str),  lod_patterns)
+            ctrl_mask = _is_positive(df[c_ctrl].astype(str), ctrl_patterns)
+
+            sd_si   = sd_mask.sum()
+            lod_si  = lod_mask.sum()
+            ctrl_si = ctrl_mask.sum()
+
+            df['score'] = sd_mask.astype(int) + lod_mask.astype(int) + ctrl_mask.astype(int)
+
+            score_avg  = df['score'].mean()
+            strong_si  = (df['score'] == 3).sum()
+            weak_si    = (df['score'] <= 1).sum()
+
             quality_summary = f"""
 ### Análisis de Calidad Científica y Sesgo (GRADE / Cochrane adaptada)
 
@@ -199,35 +232,56 @@ El análisis cualitativo de la muestra de **{total_papers} artículos** revela l
 
 **Nivel de Calidad Promedio de la Muestra:** **{score_avg:.2f} / 3.00**
 *   **Recomendación Fuerte (Bajo sesgo, Score = 3):** {strong_si} artículos ({strong_si/total_papers*100:.1f}%).
-*   **Alto Riesgo de Sesgo (Score <= 1):** {weak_si} artículos ({weak_si/total_papers*100:.1f}%).
+*   **Alto Riesgo de Sesgo (Score ≤ 1):** {weak_si} artículos ({weak_si/total_papers*100:.1f}%).
 """
-            bias_data.append("| Autor (Año) | Reporta Calidad | Bajo Sesgo | Controles / Evidencia | GRADE Score |")
+            bias_data.append("| Autor (Áño) | Reporta Calidad | Bajo Sesgo | Controles / Evidencia | GRADE Score |")
             bias_data.append("|---|---|---|---|---|")
-            
+
             col_author = [c for c in df.columns if "autor" in c.lower() or "año" in c.lower()]
             c_auth = col_author[0] if col_author else df.columns[1]
-            
+
             for _, r in df.iterrows():
-                auth = r[c_auth]
-                sd_val = "Sí" if "s" in str(r[c_sd]).lower() or "alta" in str(r[c_sd]).lower() or "fuerte" in str(r[c_sd]).lower() else "No"
-                lod_val = "Sí" if "s" in str(r[c_lod]).lower() or "bajo" in str(r[c_lod]).lower() or "baja" in str(r[c_lod]).lower() else "No"
-                ctrl_val = "Sí" if "s" in str(r[c_ctrl]).lower() or "alta" in str(r[c_ctrl]).lower() or "fuerte" in str(r[c_ctrl]).lower() or "moderada" in str(r[c_ctrl]).lower() else "No"
-                scr = r['score']
+                auth     = r[c_auth]
+                sd_val   = "Sí" if sd_mask.loc[r.name]   else "No"
+                lod_val  = "Sí" if lod_mask.loc[r.name]  else "No"
+                ctrl_val = "Sí" if ctrl_mask.loc[r.name] else "No"
+                scr      = r['score']
                 bias_data.append(f"| {auth} | {sd_val} | {lod_val} | {ctrl_val} | **{scr} / 3** |")
-                
+
             quality_summary += "\n" + "\n".join(bias_data)
-            return quality_summary
+
+            # Devolver también las estadísticas para que generate_rqs_markdown las use
+            quality_stats = {
+                "total_papers" : total_papers,
+                "sd_pct"       : sd_si   / total_papers * 100,
+                "lod_pct"      : lod_si  / total_papers * 100,
+                "ctrl_pct"     : ctrl_si / total_papers * 100,
+                "score_avg"    : score_avg,
+                "strong_si"    : int(strong_si),
+                "strong_pct"   : strong_si / total_papers * 100,
+                "weak_si"      : int(weak_si),
+                "weak_pct"     : weak_si   / total_papers * 100,
+            }
+            return quality_summary, quality_stats
+
     except Exception as e:
         logger.error(f"Error al analizar calidad y sesgo en Excel: {e}")
-    return None
+    return None, {}
 
 analyze_quality_bias_from_excel = parse_quality_and_bias
+alyze_quality_bias_from_excel = parse_quality_and_bias
 
-def generate_rqs_markdown(input_file):
-    """Auto-genera preguntas de investigación (RQs) dinámicas a partir de las keywords más frecuentes del corpus."""
+def generate_rqs_markdown(input_file, quality_stats=None):
+    """Auto-genera preguntas de investigación (RQs) dinámicas a partir de las keywords más frecuentes del corpus.
+
+    Args:
+        input_file: Ruta al Excel de auditoría.
+        quality_stats: Dict con métricas reales de parse_quality_and_bias (opcional).
+                       Si se provee, RQ3 mostrará datos cuantitativos reales del corpus.
+    """
     if not input_file or not input_file.lower().endswith(".xlsx"):
         return ""
-        
+
     try:
         xl = pd.ExcelFile(input_file)
         sheet_name = None
@@ -237,49 +291,62 @@ def generate_rqs_markdown(input_file):
                 break
         if not sheet_name:
             sheet_name = xl.sheet_names[0]
-            
+
         df = pd.read_excel(input_file, sheet_name=sheet_name)
-        
+
         text_content = ""
         for col_name in ["abstract", "titulo", "descubrimiento", "aporte", "tema", "Título", "Abstract"]:
             matching_cols = [c for c in df.columns if col_name in c.lower()]
             if matching_cols:
                 text_content += " " + " ".join(df[matching_cols[0]].dropna().astype(str).tolist())
         text_content = text_content.lower()
-        
+
         stopwords = {
             "the", "a", "an", "of", "in", "for", "and", "or", "to", "on", "at", "by", "with", "from",
             "is", "are", "was", "were", "this", "that", "these", "those", "it", "its", "be", "been",
             "study", "research", "analysis", "results", "effect", "effects", "using", "based", "used"
         }
-        
+
         words = re.findall(r'\b[a-z]{4,}\b', text_content)
         freq = {}
         for w in words:
             if w not in stopwords:
                 freq[w] = freq.get(w, 0) + 1
-                
+
         sorted_kws = sorted(freq.items(), key=lambda x: -x[1])
         top_kws = [k.title() for k, v in sorted_kws[:6]]
-        
+
         while len(top_kws) < 6:
             top_kws.append(f"TópicoClave{len(top_kws)+1}")
-            
+
         k1, k2, k3, k4, k5, k6 = top_kws[:6]
-        
+
+        # Construir respuesta de RQ3 con datos reales si están disponibles
+        if quality_stats and quality_stats.get("total_papers"):
+            qs = quality_stats
+            rq3_response = (
+                f"El corpus incluye **{qs['strong_si']} artículos ({qs['strong_pct']:.1f}%)** con score GRADE = 3/3 "
+                f"(bajo sesgo, controles adecuados y reporte estadístico robusto), "
+                f"sobre un total de {qs['total_papers']} trabajos analizados. "
+                f"El promedio de rigor metodológico es **{qs['score_avg']:.2f}/3.00**. "
+                f"{qs['weak_si']} artículos ({qs['weak_pct']:.1f}%) presentan score ≤ 1 (alto riesgo de sesgo)."
+            )
+        else:
+            rq3_response = "Consultar la Tabla de Calidad GRADE adjunta para evaluación detallada del corpus."
+
         rqs_md = f"""
 ### Preguntas de Investigación (Research Questions - RQs) Auto-generadas
 
 El manuscrito y la revisión sistemática se estructuran formalmente en base a las siguientes preguntas metodológicas generadas automáticamente a partir de las palabras clave del corpus:
 
 1.  **RQ1 (Estado del Arte):** ¿Cómo ha evolucionado la producción científica y la colaboración académica internacional sobre **{k1}** y su relación con **{k2}**?
-    *   *Respuesta basada en datos:* Las tendencias indican un crecimiento sostenido de publicaciones que asocian **{k1}** como eje central de investigación metodológica.
+    *   *Guía de análisis:* Examinar la distribución temporal de publicaciones, redes de co-autoría y fuentes principales que concentran investigación sobre **{k1}** en el periodo analizado.
 2.  **RQ2 (Diseño Metodológico):** ¿Qué aproximaciones en el diseño experimental o tecnológico de **{k3}** han demostrado mayor consistencia para el análisis de **{k4}**?
-    *   *Respuesta basada en datos:* Mapeado según el análisis cuantitativo de la matriz de síntesis y la robustez del reporte empírico.
+    *   *Guía de análisis:* Comparar las columnas de diseño metodológico y técnicas en la matriz de síntesis. Identificar los métodos más recurrentes y su asociación con resultados positivos.
 3.  **RQ3 (Rigor Científico):** ¿Cuál es el nivel de consistencia estadística y de reporte experimental en los estudios que investigan **{k5}**?
-    *   *Respuesta basada en datos:* Evaluado de forma objetiva mediante la matriz de calidad (GRADE) en relación con réplicas y desviaciones estándar.
+    *   *Respuesta basada en datos del corpus:* {rq3_response}
 4.  **RQ4 (Limitaciones y Tendencias):** ¿Cuáles son las limitaciones críticas reportadas en torno a **{k6}** y qué perspectivas futuras se delinean para el sector?
-    *   *Respuesta basada en datos:* Consolidada a partir de los aportes teóricos y limitaciones mapped en la base de conocimiento local.
+    *   *Guía de análisis:* Revisar la columna de limitaciones de la matriz de síntesis y los aportes teóricos de los artículos de mayor calidad GRADE.
 """
         return rqs_md
     except Exception as e:
@@ -415,16 +482,18 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 6. Intervención / Exposición — health_sciences
             elif any(w in t_col_lower for w in ["intervención", "intervencion", "exposición", "exposicion", "intervention", "exposure", "tratamiento"]):
                 interv_patterns = [
-                    r'(?:treated?\s+with|administered|received?|intervención(?:\s+\w+){0,3})\s+([\w\-\s]+(?:\d+\s*(?:mg|g|mcg|IU))?)',
+                    r'(?:treated?\s+with|administered|received?|exposed?\s+to|intervención(?:\s+\w+){0,3})\s+([\w\-\s]+(?:\d+\s*(?:mg|g|mcg|IU|ml|ug))?)',
                     r'(?:mg|g|mcg|IU|dose)[^.]{0,80}',
                     r'(?:vs\.?|versus|compared\s+to|frente\s+a)[^.]{0,80}',
                 ]
+                target_search = abstract if (abstract and abstract.strip() not in ("", "nan", "Abstract no disponible.", "n/a")) else search_text
                 for pat in interv_patterns:
-                    m = re.search(pat, search_text, re.IGNORECASE)
+                    m = re.search(pat, target_search, re.IGNORECASE)
                     if m:
                         snippet = m.group(0).strip()
-                        val = _truncate_at_word(snippet, 90)
-                        break
+                        if len(snippet) >= 10 and title.lower() not in snippet.lower():
+                            val = _truncate_at_word(snippet, 90)
+                            break
 
             # 7. Desenlace / Outcome
             elif any(w in t_col_lower for w in ["desenlace", "outcome", "endpoint", "result", "resultado"]):
@@ -476,6 +545,22 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                         "Generalizabilidad limitada por contexto poblacional",
                     ]
                     val = fallbacks[idx % len(fallbacks)]
+
+            # 9.5 Nivel de Evidencia (GRADE) — health_sciences / genérico
+            elif any(w in t_col_lower for w in ["nivel de evidencia", "grade", "evidencia (grade)"]):
+                grade_patterns = [
+                    r'\b(alta|moderada|baja|muy\s+baja|high|moderate|low|very\s+low)\b',
+                    r'\b(systematic review|meta.analysis|rct|randomized|cohort|case.control|cross.sectional)\b',
+                ]
+                target_search = abstract if (abstract and abstract.strip() not in ("", "nan", "Abstract no disponible.", "n/a")) else search_text
+                for pat in grade_patterns:
+                    m = re.search(pat, target_search, re.IGNORECASE)
+                    if m:
+                        val = m.group(0).strip().title()
+                        break
+                else:
+                    val = "No reportado"
+
 
             # 10. Fallback genérico semántico: busca oración relevante por palabras clave de la columna
             else:

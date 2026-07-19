@@ -419,8 +419,15 @@ def run_r_report(rscript_path, input_file, output_html):
     from .matrix_generator import parse_quality_and_bias, generate_rqs_markdown
     
     # Extraer secciones de RQs y calidad de sesgo desde Python
-    quality_section = parse_quality_and_bias(input_file) or ""
-    rqs_section = generate_rqs_markdown(input_file) or ""
+    quality_res = parse_quality_and_bias(input_file)
+    if isinstance(quality_res, tuple) and len(quality_res) == 2:
+        quality_section, quality_stats = quality_res
+    else:
+        quality_section, quality_stats = quality_res, {}
+        
+    quality_section = quality_section or ""
+    rqs_section = generate_rqs_markdown(input_file, quality_stats) or ""
+
     
     # Buscar e inyectar el diagrama PRISMA
     input_dir = os.path.dirname(input_file) if input_file else ""

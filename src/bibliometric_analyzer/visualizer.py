@@ -7,11 +7,14 @@ from .themes import CLUSTER_COLORS
 
 logger = logging.getLogger("bibliometric_analyzer")
 
+from .themes import CLUSTER_COLORS, STOP_WORDS
+
 def auto_classify_axes(keywords_list):
     """Agrupa de forma dinámica palabras clave en clusters temáticos (ejes).
     
     Nombra cada cluster basado en las 3 palabras clave más frecuentes.
     Asigna un color de CLUSTER_COLORS de forma secuencial.
+    Filtra stopwords usando la lista compartida de themes.STOP_WORDS.
     """
     if not keywords_list:
         return {}, []
@@ -19,7 +22,8 @@ def auto_classify_axes(keywords_list):
     freq = {}
     for kw in keywords_list:
         kw_lower = kw.lower().strip()
-        if kw_lower and len(kw_lower) > 2:
+        # Filtrar stopwords y palabras muy cortas (evita "with", "from", "using")
+        if kw_lower and len(kw_lower) > 2 and kw_lower not in STOP_WORDS:
             freq[kw_lower] = freq.get(kw_lower, 0) + 1
             
     if not freq:
