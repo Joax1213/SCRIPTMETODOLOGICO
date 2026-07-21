@@ -23,3 +23,10 @@ ENV/
 !task.md
 !implementation_plan.md
 !walkthrough.md
+
+# Folder for presentation local test
+presentacion/
+presentación/
+*.egg-info/
+
+

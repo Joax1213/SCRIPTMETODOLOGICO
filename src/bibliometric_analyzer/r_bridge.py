@@ -228,9 +228,11 @@ def convert_xlsx_to_scopus_csv(input_file):
                 col_abstract = [c for c in df.columns if "abstract" in c.lower() or "resumen" in c.lower()]
                 if col_abstract:
                     local_abstract = str(r_match[col_abstract[0]]).strip()
-                col_pilar = [c for c in df.columns if "pilar" in c.lower() or "tema" in c.lower() or "keyword" in c.lower()]
+                col_pilar = [c for c in df.columns if ("pilar" in c.lower() or "keyword" in c.lower() or c.lower() == "eje temático") and "aporte" not in c.lower()]
                 if col_pilar and str(r_match[col_pilar[0]]).strip().lower() not in ["nan", ""]:
-                    keywords_str = str(r_match[col_pilar[0]]).strip()
+                    kw_val = str(r_match[col_pilar[0]]).strip()
+                    if len(kw_val) < 100:
+                        keywords_str = kw_val
 
             scopus_data = get_scopus_paper_data(d, scopus_key)
             

@@ -750,24 +750,28 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
 
             row[t_col] = val
             
-        # Inferir calidad, sesgo y evidencia a partir del contenido del abstract/texto
-        _abs_lower = abstract.lower()
-        _has_stats = any(w in _abs_lower for w in [
+        # Inferir calidad, sesgo y evidencia a partir del contenido completo de búsqueda (título, abstract, descubrimientos, métodos)
+        _search_text_lower = search_text.lower() + " " + str(row.get("Descubrimientos Principales", "")).lower()
+        _has_stats = any(w in _search_text_lower for w in [
             "p < 0.05", "p<0.05", "significance", "confidence interval", "95% ci",
             "standard deviation", "mean ±", "anova", "regression", "odds ratio",
-            "statistical", "p-value", "p value", "desviación estándar"
+            "statistical", "p-value", "p value", "desviación estándar", "mg/g", "ug/g", "g/kg",
+            "mm", "um", "µm", "hplc", "spectrophotomet", "cromatograf", "cuantific"
         ])
-        _has_controls = any(w in _abs_lower for w in [
-            "control group", "control negativo", "randomized", "blinded",
-            "placebo", "replicate", "validated", "calibrated", "replicado", "calibrado"
+        _has_controls = any(w in _search_text_lower for w in [
+            "control group", "control negativo", "control", "randomized", "blinded",
+            "placebo", "replicate", "validated", "calibrated", "replicado", "calibrado",
+            "treated", "treatment", "elicit", "compar"
         ])
-        _low_bias = any(w in _abs_lower for w in [
+        _low_bias = any(w in _search_text_lower for w in [
             "randomized", "double-blind", "systematic review", "meta-analysis",
-            "cochrane", "grade", "revisión sistemática", "ensayo clínico aleatorizado"
+            "cochrane", "grade", "revisión sistemática", "ensayo clínico aleatorizado",
+            "hplc-uv", "lc-ms", "gc-ms", "hptlc", "spectrophotometr", "espectrofotometr"
         ])
-        row["Calidad del Estudio (Alta/Media/Baja)"] = "Alta" if (_has_stats and _has_controls) else ("Media" if _has_stats else "Por revisar")
-        row["Riesgo de Sesgo"] = "Bajo" if _low_bias else ("Moderado" if _has_controls else "Por revisar")
+        row["Calidad del Estudio (Alta/Media/Baja)"] = "Alta" if (_has_stats and _has_controls) else ("Media" if _has_stats else "Baja")
+        row["Riesgo de Sesgo"] = "Bajo" if _low_bias else ("Moderado" if _has_controls else "Alto")
         row["Nivel de Evidencia"] = "Fuerte" if _low_bias else ("Moderado" if _has_stats else "Limitado")
+
         
         rows.append(row)
         
