@@ -22,6 +22,80 @@ def _truncate_at_word(text, max_chars):
         truncated = truncated[:last_space]
     return truncated.rstrip('.,;') + '...'
 
+def extract_valid_species(title, abstract):
+    """
+    Extrae de forma robusta la especie/variedad vegetal en formato binomial
+    evitando falsos positivos (p.ej., 'The effect', 'Quantitative analysis').
+    """
+    binomial_regex = r'\b([A-Z][a-z]+ [a-z]{3,}(?:\s+[A-Z][a-zA-Z]*\.)?)\b'
+    
+    # 1. Definir diccionarios de validación taxonómica
+    KNOWN_GENERA = {
+        "vicia", "mucuna", "glycine", "phaseolus", "hybanthus", "crataegus", 
+        "solanum", "medicago", "lupinus", "zea", "oryza", "triticum", 
+        "brassica", "capsicum", "arabidopsis", "cannabis", "camellia", "coffea", 
+        "mentha", "rosmarinus", "citrus", "passiflora", "ginkgo", "panax", 
+        "withania", "aloe", "curcuma", "zingiber", "salvia", "nicotiana",
+        "pisum", "lens", "cicer", "arachis", "hordeum", "secale", "avena"
+    }
+    
+    GENERIC_FIRST_WORDS = {
+        "the", "effect", "effects", "analysis", "evaluation", "study", "impact", "role", 
+        "activity", "feeding", "method", "approach", "content", "extraction", "assessment", 
+        "determination", "comparative", "quantitative", "secondary", "total", "response", 
+        "production", "plant", "seed", "leaf", "root", "fruit", "water", "a", "an", "in", 
+        "on", "under", "with", "using", "new", "development", "efficacy", "potential", 
+        "characterization", "phytochemical", "antioxidant", "profiles", "chemical", "composition",
+        "isolation", "structural"
+    }
+    
+    GENERIC_SECOND_WORDS = {
+        "and", "use", "for", "with", "from", "under", "during", "into", "activity", "approach", 
+        "feeding", "method", "content", "the", "a", "an", "of", "to", "in", "on", "as", "by",
+        "is", "at", "plant", "seeds", "leaves", "roots", "fruits", "yield", "extract", "extracts",
+        "oil", "oils", "meal", "meals", "protein", "proteins", "acid", "acids", "compound",
+        "compounds", "substance", "substances"
+    }
+
+    def is_valid_binomial(cand):
+        words = cand.split()
+        if len(words) < 2:
+            return False
+        w1_low = words[0].lower()
+        w2_low = words[1].lower()
+        
+        # Si la primera palabra es genérica/stopword de títulos, rechazar
+        if w1_low in GENERIC_FIRST_WORDS:
+            return False
+        # Si la segunda palabra es stopword/conjunción, rechazar
+        if w2_low in GENERIC_SECOND_WORDS:
+            return False
+        return True
+
+    # Intentar buscar candidatos con el regex binomial en título y abstract
+    for text in (title, abstract):
+        if not text:
+            continue
+        candidates = re.findall(binomial_regex, text)
+        for cand in candidates:
+            cand_clean = cand.strip()
+            if is_valid_binomial(cand_clean):
+                return cand_clean
+
+    # Fallback: buscar directamente coincidencia de géneros conocidos seguidos por un epíteto
+    for text in (title, abstract):
+        if not text:
+            continue
+        for genus in KNOWN_GENERA:
+            pat = r'\b(' + re.escape(genus.capitalize()) + r'\s+[a-z]{3,}(?:\s+[A-Z][a-zA-Z]*\.)?)\b'
+            m = re.search(pat, text)
+            if m:
+                cand_clean = m.group(1).strip()
+                if is_valid_binomial(cand_clean):
+                    return cand_clean
+                    
+    return None
+
 def render_mermaid_to_png(mermaid_code, output_png_path):
     """Renderiza un diagrama Mermaid a un archivo PNG utilizando la API pública de mermaid.ink."""
     try:
@@ -542,16 +616,8 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 4. Especie / Variedad / Matriz / Tipo de estudio (L-1)
             elif any(w in t_col_lower for w in ["especie", "variedad", "matriz", "alimento", "producto", "establecimiento", "destino", "species", "matrix", "tipo de estudio", "diseño", "diseno"]):
                 is_species_col = any(w in t_col_lower for w in ["especie", "variedad", "species", "vegetal"])
-                binomial_regex = r'\b([A-Z][a-z]+ [a-z]{3,}(?:\s+[A-Z][a-zA-Z]*\.)?)\b'
                 
-                match_species = None
-                m_title = re.search(binomial_regex, title)
-                if m_title:
-                    match_species = m_title.group(1).strip()
-                else:
-                    m_abs = re.search(binomial_regex, abstract)
-                    if m_abs:
-                        match_species = m_abs.group(1).strip()
+                match_species = extract_valid_species(title, abstract)
                 
                 if match_species:
                     val = match_species
@@ -579,6 +645,49 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
                     val = "Matriz de Trigo"
                 else:
                     val = "No identificada" if is_species_col else "Modelo de Estudio"
+
+            # 4.5 Tejido Analizado / Órgano / Parte de la Planta
+            elif any(w in t_col_lower for w in ["tejido", "tissue", "órgano", "organ", "parte de la planta", "plant part", "matriz vegetal"]):
+                found_tissue = None
+                search_text_lower_spaced = f" {search_text_lower} "
+                
+                # Mapear patrones en orden de especificidad
+                tissue_patterns = [
+                    # Inglés
+                    (r'\b(leaf extract|leaves|leaf)\b', "Hojas"),
+                    (r'\b(seed extract|seeds|seed|grain|grains)\b', "Semillas"),
+                    (r'\b(fruit extract|fruits|fruit|berry|berries|pericarp)\b', "Frutos"),
+                    (r'\b(root extract|roots|root|tuber|tubers|rhizome|rhizomes|bulb|bulbs)\b', "Raíces / Tubérculos"),
+                    (r'\b(flower extract|flowers|flower|petal|petals)\b', "Flores"),
+                    (r'\b(stem extract|stems|stem|bark|twigs|twig)\b', "Tallos / Corteza"),
+                    (r'\b(sprout|sprouts|cotyledon|cotyledons)\b', "Brotes / Cotiledones"),
+                    (r'\b(aerial part|aerial parts|partes aéreas|partes aereas)\b', "Partes Aéreas"),
+                    (r'\b(callus|cell suspension|cell cultures)\b', "Cultivo Celular / Callo"),
+                    (r'\b(whole plant|whole herbs)\b', "Planta Entera"),
+                    # Español
+                    (r'\b(extracto de hoja|hojas|hoja)\b', "Hojas"),
+                    (r'\b(extracto de semilla|semillas|semilla|grano|granos)\b', "Semillas"),
+                    (r'\b(extracto de fruto|frutos|fruto|baya|bayas|pericarpio)\b', "Frutos"),
+                    (r'\b(extracto de raíz|raíces|raiz|raices|tubérculo|tubérculos|tuberculo|tuberculos|rizoma|bulbo)\b', "Raíces / Tubérculos"),
+                    (r'\b(extracto de flor|flores|flor|pétalo|petalos)\b', "Flores"),
+                    (r'\b(extracto de tallo|tallos|tallo|corteza)\b', "Tallos / Corteza"),
+                    (r'\b(brote|brotes|cotiledón|cotiledones|cotiledon)\b', "Brotes / Cotiledones"),
+                    # General
+                    (r'\b(blood|blood sample|sangre)\b', "Sangre"),
+                    (r'\b(plasma)\b', "Plasma"),
+                    (r'\b(serum|suero)\b', "Suero"),
+                    (r'\b(liver|hígado|higado)\b', "Hígado"),
+                    (r'\b(kidney|riñón|rinon)\b', "Riñón"),
+                    (r'\b(brain|cerebro)\b', "Cerebro"),
+                    (r'\b(muscle|músculo|musculo)\b', "Músculo"),
+                ]
+                
+                for pattern, name in tissue_patterns:
+                    if re.search(pattern, search_text_lower_spaced):
+                        found_tissue = name
+                        break
+                        
+                val = found_tissue if found_tissue else "No especificado (Revisar texto completo)"
 
             # 5. Resultados Estadísticos (OR / RR / HR / p-value) — columna específica de health_sciences
             elif any(w in t_col_lower for w in ["or/rr", "or/rr/hr", "p-value", "estadístico", "estadistico", "odds ratio", "hazard"]):

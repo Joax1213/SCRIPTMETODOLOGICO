@@ -55,6 +55,13 @@ class TestParseAuthorName(unittest.TestCase):
         result = parse_author_name("Etemadi FJ")
         self.assertEqual(result, "Etemadi, F.J.")
 
+    def test_compound_surname_with_particles(self):
+        result = parse_author_name("Carlos dos Santos")
+        self.assertEqual(result, "dos Santos, C.")
+        result2 = parse_author_name("Juan de la Cruz")
+        self.assertEqual(result2, "de la Cruz, J.")
+        result3 = parse_author_name("dos Santos, Carlos")
+        self.assertEqual(result3, "dos Santos, C.")
 
 class TestFormatAuthorsList(unittest.TestCase):
 
@@ -597,6 +604,60 @@ class TestLineageEngineExecute(unittest.TestCase):
         self.assertIn("10.1234/seed", nodes)
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes["10.1234/seed"]["Título"], "Seed Article")
+
+
+class TestMatrixGeneratorImprovements(unittest.TestCase):
+
+    def test_extract_valid_species(self):
+        from bibliometric_analyzer.matrix_generator import extract_valid_species
+        # Caso 1: Evitar falsos positivos como "The effect" o "Quantitative analysis"
+        res1 = extract_valid_species("The effect of something", "Abstract containing nothing.")
+        self.assertNotEqual(res1, "The effect")
+        
+        # Caso 2: Reconocer una especie válida (Vicia faba) en el título
+        res2 = extract_valid_species("The effect of Vicia faba L. on growth", "Abstract content.")
+        self.assertEqual(res2, "Vicia faba")
+        
+        # Caso 3: Fallback a género conocido cuando el regex no es perfecto
+        res3 = extract_valid_species("Study on Crataegus oxyacantha fruit extract", "Abstract content.")
+        self.assertEqual(res3, "Crataegus oxyacantha")
+
+    def test_tissue_extraction(self):
+        from bibliometric_analyzer.matrix_generator import generate_populated_matrix
+        import tempfile
+        import pandas as pd
+        
+        temp_dir = tempfile.mkdtemp()
+        output_path = os.path.join(temp_dir, "test_tissue.xlsx")
+        
+        mock_nodes = {
+            "node1": {
+                "DOI": "10.1234/t1",
+                "Título": "Analysis of leaf extract",
+                "Autores": "Author A.",
+                "Año": "2021",
+                "Revista": "Phyto",
+                "Abstract": "We analyzed chemical profile of leaves and seeds.",
+                "TextoCompleto": "",
+            }
+        }
+        
+        try:
+            generate_populated_matrix(mock_nodes, output_path, theme="phytochemistry")
+            df = pd.read_excel(output_path)
+            # Buscar columna de tejido
+            tissue_col = [c for c in df.columns if any(w in c.lower() for w in ["tejido", "tissue", "órgano", "organ", "parte de la planta", "plant part"])]
+            self.assertTrue(len(tissue_col) > 0)
+            self.assertEqual(df.iloc[0][tissue_col[0]], "Hojas")
+        finally:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_openalex_title_unescape_and_clean(self):
+        from bibliometric_analyzer.openalex_client import _clean_openalex_title
+        raw = "&lt;i&gt;Crataegus spp&lt;/i&gt; and &amp; other species"
+        cleaned = _clean_openalex_title(raw)
+        self.assertEqual(cleaned, "Crataegus spp and & other species")
 
 
 if __name__ == "__main__":

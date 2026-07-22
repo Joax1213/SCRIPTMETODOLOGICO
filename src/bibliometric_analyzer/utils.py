@@ -23,10 +23,12 @@ def get_fallback_year():
     """Retorna el año actual dinámicamente como valor por defecto."""
     return datetime.date.today().year
 
+SURNAME_PARTICLES = {"de", "del", "da", "das", "dos", "du", "von", "van", "der", "di", "la", "le"}
+
 def parse_author_name(creator):
     """
     Normaliza y formatea un nombre de autor en formato 'Apellido, I.' (iniciales).
-    Soporta apellidos simples y compuestos.
+    Soporta apellidos simples y compuestos con partículas (de, da, dos, von, etc.).
     """
     if not creator or str(creator).strip() == "" or str(creator).strip().lower() in ("desconocido", "nan", "none"):
         return "Desconocido"
@@ -38,10 +40,13 @@ def parse_author_name(creator):
         parts = creator.split(",", 1)
         last = parts[0].strip()
         first = parts[1].strip()
-        first_init = f"{first[0]}." if first else ""
+        
+        # Extraer primera inicial válida ignorando partículas si estuvieran en el primer nombre
+        first_tokens = [t for t in first.split() if t.lower() not in SURNAME_PARTICLES]
+        first_init = f"{first_tokens[0][0].upper()}." if (first_tokens and first_tokens[0]) else (f"{first[0].upper()}." if first else "")
         return f"{last}, {first_init}"
     
-    # Formato simple sin comas (p.ej., 'Gabriel Garcia Marquez', 'John Doe' o 'Etemadi F.')
+    # Formato simple sin comas (p.ej., 'Carlos dos Santos', 'Gabriel Garcia Marquez', 'Etemadi F.')
     parts = creator.split()
     if len(parts) == 0:
         return "Desconocido"
@@ -56,10 +61,27 @@ def parse_author_name(creator):
             formatted_initials = "".join([f"{char}." for char in last_token_clean])
             return f"{surname}, {formatted_initials}"
             
-        # Fallback occidental estándar: asumimos el último token como apellido y el resto nombres
-        first_names = parts[:-1]
-        last_name = parts[-1]
-        initials = "".join([f"{n[0]}." for n in first_names])
+        # Detectar partículas al final que forman parte del apellido (ej: ["Carlos", "dos", "Santos"])
+        surname_tokens = [parts[-1]]
+        idx = len(parts) - 2
+        while idx > 0 and parts[idx].lower() in SURNAME_PARTICLES:
+            surname_tokens.insert(0, parts[idx])
+            idx -= 1
+            
+        last_name = " ".join(surname_tokens)
+        first_names = parts[:idx + 1]
+        
+        initials_list = []
+        for n in first_names:
+            if n.lower() not in SURNAME_PARTICLES and len(n) > 0:
+                clean_n = n.replace(".", "")
+                if clean_n:
+                    initials_list.append(f"{clean_n[0].upper()}.")
+                    
+        initials = "".join(initials_list)
+        if not initials and first_names:
+            initials = f"{first_names[0][0].upper()}."
+            
         return f"{last_name}, {initials}"
 
 def format_authors_list(authors_list, max_authors=5):

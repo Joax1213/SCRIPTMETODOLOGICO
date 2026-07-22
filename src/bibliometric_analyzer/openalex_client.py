@@ -1,9 +1,21 @@
+import html
+import re
 import urllib.request
 import json
 import logging
 from .utils import format_authors_list, get_ssl_context
 
 logger = logging.getLogger("bibliometric_analyzer")
+
+def _clean_openalex_title(raw_title):
+    """Descodifica entidades HTML y elimina etiquetas HTML residuales de los títulos de OpenAlex."""
+    if not raw_title:
+        return raw_title
+    # 1. Desescapar entidades HTML (&lt;i&gt; -> <i>, &amp; -> &, etc.)
+    unescaped = html.unescape(raw_title)
+    # 2. Eliminar etiquetas HTML residuales (<i>, <sub>, <sup>, etc.)
+    plain = re.sub(r'<[^>]+>', '', unescaped)
+    return plain.strip()
 
 def rebuild_abstract_inverted_index(inverted_index):
     """Reconstruye el texto original de un abstract a partir de la estructura invertida de OpenAlex."""
@@ -76,7 +88,7 @@ def get_citing_papers_openalex(doi, email, count=20, verify_ssl=True):
                 data = json.loads(response.read().decode('utf-8'))
                 results = data.get("results", [])
                 for work in results:
-                    title = work.get("title", "Sin título")
+                    title = _clean_openalex_title(work.get("title", "Sin título"))
                     raw_doi = work.get("doi")
                     if raw_doi:
                         work_doi = raw_doi.replace("https://doi.org/", "").strip()
