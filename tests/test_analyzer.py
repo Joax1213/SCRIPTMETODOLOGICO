@@ -278,6 +278,26 @@ class TestPopulatedMatrix(unittest.TestCase):
         self.assertEqual(df.iloc[1]["Concentración del Elicitor"], "No aplica — el artículo no describe un ensayo de elicitación")
         self.assertEqual(df.iloc[1]["Rendimiento del Metabolito Principal (mg/g)"], "No aplica — el artículo no describe un ensayo de elicitación")
 
+    def test_generate_populated_matrix_health_sciences_deduplication(self):
+        from bibliometric_analyzer.matrix_generator import generate_populated_matrix
+        mock_nodes = {
+            "node1": {
+                "DOI": "10.1234/test_hs",
+                "Título": "Clinical Trial Title",
+                "Autores": "Gomez R.",
+                "Año": "2022",
+                "Revista": "NEJM",
+                "Abstract": "Abstract here.",
+                "TextoCompleto": "",
+            }
+        }
+        generate_populated_matrix(mock_nodes, self.output_path, theme="health_sciences")
+        self.assertTrue(os.path.exists(self.output_path))
+        import pandas as pd
+        df = pd.read_excel(self.output_path)
+        self.assertIn("Nivel de Evidencia (GRADE)", df.columns)
+        self.assertNotIn("Nivel de Evidencia", df.columns)
+
     def test_quality_parsing_and_rqs_calculation(self):
         from bibliometric_analyzer.matrix_generator import generate_populated_matrix, parse_quality_and_bias, generate_rqs_markdown
         mock_nodes = {
@@ -315,7 +335,7 @@ class TestPopulatedMatrix(unittest.TestCase):
         
         # Test generate_rqs_markdown con stats
         rqs_md = generate_rqs_markdown(self.output_path, stats)
-        self.assertIn("promedio de rigor metodológico es **1.50/3.00**", rqs_md)
+        self.assertIn("promedio de rigor metodológico es **2.00/3.00**", rqs_md)
         self.assertIn("1 artículos (50.0%)** con score GRADE = 3/3", rqs_md)
 
     def tearDown(self):

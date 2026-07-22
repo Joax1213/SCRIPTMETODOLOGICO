@@ -6,7 +6,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from .themes import get_theme, BASE_COLUMNS, QUALITY_COLUMNS
+from .themes import get_theme, BASE_COLUMNS, QUALITY_COLUMNS, get_theme_columns
 
 logger = logging.getLogger("bibliometric_analyzer")
 
@@ -124,8 +124,7 @@ def generate_audit_matrix_template(output_path, theme="general"):
     logger.info(f"Generando plantilla Excel premium [Tema: {theme}] en: {output_path}")
     
     theme_spec = get_theme(theme)
-    theme_cols = theme_spec["matrix_columns"]
-    cols = BASE_COLUMNS + theme_cols + QUALITY_COLUMNS
+    cols = get_theme_columns(theme)
     
     example_row = {col: "Dato del Paper" for col in cols}
     example_row["#"] = 1
@@ -511,7 +510,7 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
     
     theme_spec = get_theme(theme)
     theme_cols = theme_spec["matrix_columns"]
-    cols = BASE_COLUMNS + theme_cols + QUALITY_COLUMNS
+    cols = get_theme_columns(theme)
     
     rows = []
     for idx, (node_id, data) in enumerate(nodes.items(), 1):
@@ -776,6 +775,9 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 9.5 Nivel de Evidencia (GRADE) — health_sciences / genérico
             elif any(w in t_col_lower for w in ["nivel de evidencia", "grade", "evidencia (grade)"]):
                 grade_patterns = [
+                    r'\b(high\s+evidence|evidence\s+is\s+high|alta\s+evidencia|evidencia\s+alta)\b',
+                    r'\b(moderate\s+evidence|evidence\s+is\s+moderate|moderada\s+evidencia|evidencia\s+moderada)\b',
+                    r'\b(low\s+evidence|evidence\s+is\s+low|baja\s+evidencia|evidencia\s+baja)\b',
                     r'\b(alta|moderada|baja|muy\s+baja|high|moderate|low|very\s+low)\b',
                 ]
                 target_search = abstract if (abstract and abstract.strip() not in ("", "nan", "Abstract no disponible.", "n/a")) else search_text
