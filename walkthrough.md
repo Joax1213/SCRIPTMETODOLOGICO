@@ -98,3 +98,18 @@ Se ejecutó una prueba exhaustiva en vivo del pipeline cienciométrico completo 
 
 Todos los cambios fueron sincronizados y empujados exitosamente a GitHub (Commit [`3751bf2`](https://github.com/Joax1213/SCRIPTMETODOLOGICO)).
 
+---
+
+## 7. Ejecución de la Prueba 5 (Plant Biotechnology Journal DOI 10.1111/pbi.12422)
+
+Se ejecutó con éxito el pipeline completo para la **Prueba 5** (tema: `phytochemistry`) utilizando el DOI semilla `10.1111/pbi.12422`.
+
+*   **Carpeta de salida:** [presentacion/prueba5/](file:///c:/Users/JOAQUIN/Documents/SCRIPMETODOLÓGICO_github/presentacion/prueba5/)
+*   **Archivos Generados:**
+    *   **Matriz Excel:** [matriz_auditoria_automatizada.xlsx](file:///c:/Users/JOAQUIN/Documents/SCRIPMETODOLÓGICO_github/presentacion/prueba5/matriz_auditoria_automatizada.xlsx) (100% libre de columnas duplicadas).
+    *   **Grafo de Citas:** [red_investigacion.html](file:///c:/Users/JOAQUIN/Documents/SCRIPMETODOLÓGICO_github/presentacion/prueba5/red_investigacion.html) (BFS & PageRank).
+    *   **Grafo de Co-ocurrencias R:** [red_coocurrencia.html](file:///c:/Users/JOAQUIN/Documents/SCRIPMETODOLÓGICO_github/presentacion/prueba5/red_coocurrencia.html) (Vis.js).
+    *   **Reporte Editorial R Markdown:** [reporte_editorial.html](file:///c:/Users/JOAQUIN/Documents/SCRIPMETODOLÓGICO_github/presentacion/prueba5/reporte_editorial.html) (HTML compilado con Pandoc).
+    *   **Diagrama PRISMA:** [figuras/metodologia_prisma.png](file:///c:/Users/JOAQUIN/Documents/SCRIPMETODOLÓGICO_github/presentacion/prueba5/figuras/metodologia_prisma.png) (Mermaid renderizado a PNG).
+
+
