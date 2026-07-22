@@ -703,6 +703,15 @@ class TestMatrixGeneratorImprovements(unittest.TestCase):
                 "Revista": "NEJM",
                 "Abstract": "Patients received autologous CD34+ cells with Metformin.",
                 "TextoCompleto": "",
+            },
+            "node2": {
+                "DOI": "10.1234/h2",
+                "Título": "Organ failure mutagenesis trial",
+                "Autores": "Author C.",
+                "Año": "2023",
+                "Revista": "NEJM",
+                "Abstract": "Severe disease typically characterized by organ failure and mutagenesis. In this paper we study risk factors.",
+                "TextoCompleto": "",
             }
         }
         
@@ -711,8 +720,12 @@ class TestMatrixGeneratorImprovements(unittest.TestCase):
             df = pd.read_excel(output_path)
             interv_col = [c for c in df.columns if any(w in c.lower() for w in ["intervención", "intervencion", "intervention"])]
             self.assertTrue(len(interv_col) > 0)
-            val = df.iloc[0][interv_col[0]]
-            self.assertIn("CD34+", val)
+            val1 = df.iloc[0][interv_col[0]]
+            val2 = df.iloc[1][interv_col[0]]
+            self.assertIn("CD34+", val1)
+            # Debe extraer la oración completa de fallback, no fragmentos cortados como "gan failure" o "g mutagenesis"
+            self.assertNotIn("gan failure", val2)
+            self.assertNotIn("g mutagenesis", val2)
         finally:
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)

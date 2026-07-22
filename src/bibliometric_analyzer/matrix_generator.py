@@ -708,9 +708,9 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 6. Intervención / Exposición — health_sciences
             elif any(w in t_col_lower for w in ["intervención", "intervencion", "exposición", "exposicion", "intervention", "exposure", "tratamiento"]):
                 interv_patterns = [
-                    r'(?:treated?\s+with|administered|received?|exposed?\s+to|intervención(?:\s+\w+){0,3})\s+([\w\-\s+%/()]+(?:\d+\s*(?:mg|g|mcg|IU|ml|ug))?)',
-                    r'(?:mg|g|mcg|IU|dose)[^.]+',
-                    r'(?:vs\.?|versus|compared\s+to|frente\s+a)[^.]+',
+                    r'\b(?:treated?\s+with|administered|received?|exposed?\s+to|intervención(?:\s+\w+){0,3})\b\s+([\w\-\s+%/()]+(?:\d+\s*(?:mg|g|mcg|IU|ml|ug))?)',
+                    r'\b(?:mg|g|mcg|ug|ml|IU|dose)\b[^.]+',
+                    r'\b(?:vs\.?|versus|compared\s+to|frente\s+a)\b[^.]+',
                 ]
                 target_search = abstract if (abstract and abstract.strip() not in ("", "nan", "Abstract no disponible.", "n/a")) else search_text
                 for pat in interv_patterns:
