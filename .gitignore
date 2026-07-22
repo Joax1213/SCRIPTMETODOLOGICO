@@ -22,7 +22,7 @@ ENV/
 !README.md
 !task.md
 !implementation_plan.md
-!walkthrough.md
+walkthrough.md
 
 # Folder for presentation local test
 presentacion/
