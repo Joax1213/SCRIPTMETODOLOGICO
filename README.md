@@ -41,11 +41,20 @@ The CLI supports dynamic extraction schemas tailored to specific scientific disc
 
 | Theme Code (`--theme`) | Domain / Focus | Key Fields Extracted |
 |---|---|---|
-| `phytochemistry` | Plant Biochemistry & Bio-processes | Plant Species, Plant Part/Tissue, Elicitor/Precursor, HPLC-UV/analytical method, Yield (mg/g) |
-| `health_sciences` | Medical Genomics & Clinical Trials | Study Type (RCT/Cohort/Cross-sectional), Sample Size, Intervention (CD34+, Metformin, etc.), Outcome, OR/RR/HR/$p$-value, GRADE Level of Evidence |
-| `industrial_engineering` | Process Optimization | Industrial Process, Methodology (Six Sigma/DMAIC/Lean), KPI (OEE/Cpk/Lead Time), Improvement % |
-| `computer_science` | AI & Software Engineering | Model Architecture, Benchmark Dataset, Metric (F1/Accuracy/Latency), Baseline |
 | `general` | Multidisciplinary Studies | General Research Objectives, Methodological Design, Key Findings |
+| `phytochemistry` | Plant Biochemistry & Bio-processes | Plant Species, Plant Part/Tissue, Elicitor/Precursor, HPLC-UV/analytical method, Yield (mg/g) |
+| `engineering` | Engineering & Technology | System/Process Type, Input variables, Response variables, Optimization method |
+| `industrial_engineering` | Process Optimization | Industrial Process, Methodology (Six Sigma/DMAIC/Lean), KPI (OEE/Cpk/Lead Time), Improvement % |
+| `social_sciences` | Social Sciences & Education | Social Context, Research Design, Data collection instrument, Analysis categories |
+| `health_sciences` | Medical Genomics & Clinical Trials | Study Type (RCT/Cohort/Cross-sectional), Sample Size, Intervention (CD34+, Metformin, etc.), Outcome, OR/RR/HR/$p$-value, GRADE Level of Evidence |
+| `environmental` | Environmental Sciences & Ecology | Ecosystem/Study Area, Species/Environmental variables, Sampling method, Indicators |
+| `economics` | Economics & Business Administration | Country/Region, Analysis Period, Econometric Model, Dependent/Independent variables |
+| `law` | Law & Legal Sciences | Jurisdiction, Normative Framework, Legal Method (Dogmatic/Comparative/Empirical), Thesis |
+| `computer_science` | AI & Software Engineering | Model Architecture, Benchmark Dataset, Metric (F1/Accuracy/Latency), Baseline |
+| `hospitality` | Hospitality & Tourism | Establishment/Destination Type, Market Segment, Methodology (SERVQUAL/HOLSAT), KPIs |
+| `gastronomy` | Gastronomy & Restaurant Industry | Service/Gastronomic Concept, Product/Input, Culinary Technique, Sensory analysis |
+| `food_science` | Food Science & Technology | Food Matrix, Applied Treatment, Physico-chemical analysis, Microbiology, Shelf Life |
+
 
 ---
 
