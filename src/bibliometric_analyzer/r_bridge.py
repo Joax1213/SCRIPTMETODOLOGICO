@@ -758,16 +758,26 @@ if (!is.null(top_keys) && nrow(top_keys) > 0) {
 
 El mapa de co-ocurrencia de palabras clave permite observar cómo se asocian y estructuran los conceptos y variables en el cuerpo de la literatura:
 
-```{r red_conceptual, echo=FALSE, results="hide", warning=FALSE, message=FALSE, fig.width=10, fig.height=8}
+```{r red_conceptual, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10, fig.height=8}
 # Red de palabras clave principales protegida contra datos insuficientes o vacíos
 tryCatch({
   net_k <- biblioNetwork(M, analysis = "co-occurrences", network = "keywords", sep = ";")
-  invisible(networkPlot(net_k, n = 15, Title = "Red de Co-ocurrencia de Conceptos (Palabras Clave)", 
+  networkPlot(net_k, n = 15, Title = "Red de Co-ocurrencia de Conceptos (Palabras Clave)", 
               type = "fruchterman", size = TRUE, remove.multiple = FALSE, edges.min = 1, 
-              labelsize = 0.7, label.cex = FALSE, halo = TRUE, community.repulsion = 0.8))
+              labelsize = 0.7, label.cex = FALSE, halo = TRUE, community.repulsion = 0.8)
 }, error = function(e) {
   cat("No se pudo generar el mapa de co-ocurrencia temática debido a datos insuficientes o vacíos de palabras clave.\\n")
 })
+```
+
+```{=html}
+<div style="text-align: center; margin: 25px 0; background: #ffffff; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+  <h4 style="color: #1b4332; margin-top: 0;">Visualización de la Red Conceptual de Co-ocurrencias</h4>
+  <img src="figuras/red_conceptual-1.png" alt="Red de Co-ocurrencia de Conceptos" style="max-width: 100%; height: auto; border-radius: 6px; border: 1px solid #ddd;" onerror="this.onerror=null; this.src='red_conceptual-1.png';" />
+  <div style="margin-top: 15px;">
+    <a href="red_coocurrencia.html" target="_blank" style="display: inline-block; padding: 10px 20px; background: #1b4332; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold;">🌐 Abrir Visor Vectorial Interactivo 2D (HTML) →</a>
+  </div>
+</div>
 ```
 
 {rqs_section}
@@ -779,20 +789,24 @@ tryCatch({
     rmd_template = rmd_template.replace("{rqs_section}", rqs_section)
     rmd_template = rmd_template.replace("{quality_section}", quality_section)
 
-    temp_rmd_path = os.path.join(output_dir, "temp_report.Rmd")
-    temp_rmd_path_esc = temp_rmd_path.replace("\\", "\\\\")
+    output_dir_slash = os.path.abspath(output_dir).replace("\\", "/")
+    temp_rmd_name = "temp_report.Rmd"
+    temp_rmd_path = os.path.join(output_dir, temp_rmd_name)
+    output_html_name = os.path.basename(output_html)
+    input_slash = os.path.abspath(r_input).replace("\\", "/")
 
     r_code = f"""
     library(bibliometrix)
     library(rmarkdown)
     
+    setwd("{output_dir_slash}")
     cat("Cargando y convirtiendo datos...\\n")
-    M <- convert2df(file = "{input_esc}", dbsource = "{dbsource}", format = "{format_type}")
+    M <- convert2df(file = "{input_slash}", dbsource = "{dbsource}", format = "{format_type}")
     cat("Ejecutando análisis cienciométrico...\\n")
     results <- biblioAnalysis(M, sep = ";")
     
     cat("Renderizando reporte cienciométrico con R Markdown...\\n")
-    render("{temp_rmd_path_esc}", output_file = "{output_esc}")
+    render("{temp_rmd_name}", output_file = "{output_html_name}")
     """
     
     logger.info(f"\n[R-Bibliometrix] Intentando compilar reporte cienciométrico oficial R Markdown para '{input_file}'...")
@@ -835,6 +849,18 @@ tryCatch({
         write.csv(df_sources, file = file.path("{temp_dir_esc_fb}", "r_sources.csv"), row.names=FALSE)
         write.csv(df_authors, file = file.path("{temp_dir_esc_fb}", "r_authors.csv"), row.names=FALSE)
         write.csv(M[, c("UT", "TI", "AU", "PY", "JI", "AB")], file = file.path("{temp_dir_esc_fb}", "r_meta.csv"), row.names=FALSE)
+        
+        # Generar imagen de la Red Conceptual
+        tryCatch({{
+            fig_dir <- file.path("{temp_dir_esc_fb}", "figuras")
+            dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
+            png(file.path(fig_dir, "red_conceptual-1.png"), width=900, height=700, res=120)
+            net_k <- biblioNetwork(M, analysis = "co-occurrences", network = "keywords", sep = ";")
+            networkPlot(net_k, n = 15, Title = "Red de Co-ocurrencia de Conceptos (Palabras Clave)", 
+                        type = "fruchterman", size = TRUE, remove.multiple = FALSE, edges.min = 1, 
+                        labelsize = 0.7, label.cex = FALSE, halo = TRUE, community.repulsion = 0.8)
+            dev.off()
+        }}, error = function(e) {{}})
         """
         fd_fb, temp_path_fb = tempfile.mkstemp(suffix=".R")
         os.close(fd_fb)
@@ -867,9 +893,14 @@ tryCatch({
         body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 30px; }}
         .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }}
         h1 {{ color: #1b4332; border-bottom: 2px solid #e9ecef; padding-bottom: 15px; margin-top: 0; }}
-        .metric-card {{ background: #f8f9fa; border-left: 5px solid #1b4332; padding: 15px; margin-bottom: 20px; border-radius: 0 8px 8px 0; }}
+        .metric-card {{ background: #f8f9fa; border-left: 5px solid #1b4332; padding: 20px; margin-bottom: 25px; border-radius: 0 8px 8px 0; }}
         .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }}
         .chart {{ background: #fff; border: 1px solid #e9ecef; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }}
+        .section-title {{ color: #1b4332; font-size: 1.4rem; font-weight: 700; margin-top: 35px; border-bottom: 2px solid #bc6c25; padding-bottom: 8px; }}
+        .img-container {{ text-align: center; margin: 20px 0; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; }}
+        .img-container img {{ max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
+        .btn-link {{ display: inline-block; padding: 12px 24px; background: #1b4332; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; transition: background 0.2s; }}
+        .btn-link:hover {{ background: #2d6a4f; }}
     </style>
 </head>
 <body>
@@ -888,6 +919,17 @@ tryCatch({
             <div class="chart">
                 <div id="chart-sources"></div>
             </div>
+        </div>
+
+        <div class="section-title">Estructura Intelectual: Red Temática de Conceptos (Co-ocurrencia)</div>
+        <div class="metric-card" style="border-left-color: #bc6c25; margin-top: 20px;">
+            <p>Mapa de co-ocurrencia temática de palabras clave que estructuran la literatura procesada:</p>
+            <div class="img-container">
+                <img src="figuras/red_conceptual-1.png" alt="Red de Co-ocurrencia de Conceptos" onerror="this.onerror=null; this.src='red_conceptual-1.png';">
+            </div>
+            <p style="margin-top: 15px;">
+                <a href="red_coocurrencia.html" target="_blank" class="btn-link">🌐 Abrir Visor Interactivo 2D de Co-ocurrencias (HTML) →</a>
+            </p>
         </div>
     </div>
     
