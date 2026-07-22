@@ -659,6 +659,44 @@ class TestMatrixGeneratorImprovements(unittest.TestCase):
         cleaned = _clean_openalex_title(raw)
         self.assertEqual(cleaned, "Crataegus spp and & other species")
 
+    def test_get_theme_columns_deduplication(self):
+        from bibliometric_analyzer.themes import get_theme_columns
+        cols = get_theme_columns("health_sciences")
+        # Debería contener "Nivel de Evidencia (GRADE)" pero NO duplicarse con la genérica "Nivel de Evidencia"
+        self.assertIn("Nivel de Evidencia (GRADE)", cols)
+        self.assertNotIn("Nivel de Evidencia", cols)
+
+    def test_clinical_intervention_extraction(self):
+        from bibliometric_analyzer.matrix_generator import generate_populated_matrix
+        import tempfile
+        import pandas as pd
+        
+        temp_dir = tempfile.mkdtemp()
+        output_path = os.path.join(temp_dir, "test_intervention.xlsx")
+        
+        mock_nodes = {
+            "node1": {
+                "DOI": "10.1234/h1",
+                "Título": "Clinical Trial",
+                "Autores": "Author B.",
+                "Año": "2022",
+                "Revista": "NEJM",
+                "Abstract": "Patients received autologous CD34+ cells with Metformin.",
+                "TextoCompleto": "",
+            }
+        }
+        
+        try:
+            generate_populated_matrix(mock_nodes, output_path, theme="health_sciences")
+            df = pd.read_excel(output_path)
+            interv_col = [c for c in df.columns if any(w in c.lower() for w in ["intervención", "intervencion", "intervention"])]
+            self.assertTrue(len(interv_col) > 0)
+            val = df.iloc[0][interv_col[0]]
+            self.assertIn("CD34+", val)
+        finally:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

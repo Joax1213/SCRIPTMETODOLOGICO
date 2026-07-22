@@ -542,9 +542,22 @@ def get_all_theme_names():
 
 
 def get_theme_columns(theme_name):
-    """Retorna BASE_COLUMNS + columnas del tema + QUALITY_COLUMNS."""
+    """Retorna BASE_COLUMNS + columnas del tema + QUALITY_COLUMNS (deduplicando)."""
     theme = get_theme(theme_name)
-    return BASE_COLUMNS + theme["matrix_columns"] + QUALITY_COLUMNS
+    theme_cols = theme["matrix_columns"]
+    
+    filtered_quality_cols = []
+    theme_cols_lower = [c.lower() for c in theme_cols]
+    for q_col in QUALITY_COLUMNS:
+        collision = False
+        for tc in theme_cols_lower:
+            if q_col.lower() in tc or tc in q_col.lower():
+                collision = True
+                break
+        if not collision:
+            filtered_quality_cols.append(q_col)
+            
+    return BASE_COLUMNS + theme_cols + filtered_quality_cols
 
 
 def get_quality_column_map(theme_name):

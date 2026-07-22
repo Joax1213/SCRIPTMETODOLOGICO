@@ -619,7 +619,7 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             elif any(w in t_col_lower for w in ["especie", "variedad", "matriz", "alimento", "producto", "establecimiento", "destino", "species", "matrix", "tipo de estudio", "diseño", "diseno"]):
                 is_species_col = any(w in t_col_lower for w in ["especie", "variedad", "species", "vegetal"])
                 
-                match_species = extract_valid_species(title, abstract)
+                match_species = extract_valid_species(title, abstract) if is_species_col else None
                 
                 if match_species:
                     val = match_species
@@ -709,7 +709,7 @@ def generate_populated_matrix(nodes, output_path, theme="general"):
             # 6. Intervención / Exposición — health_sciences
             elif any(w in t_col_lower for w in ["intervención", "intervencion", "exposición", "exposicion", "intervention", "exposure", "tratamiento"]):
                 interv_patterns = [
-                    r'(?:treated?\s+with|administered|received?|exposed?\s+to|intervención(?:\s+\w+){0,3})\s+([\w\-\s]+(?:\d+\s*(?:mg|g|mcg|IU|ml|ug))?)',
+                    r'(?:treated?\s+with|administered|received?|exposed?\s+to|intervención(?:\s+\w+){0,3})\s+([\w\-\s+%/()]+(?:\d+\s*(?:mg|g|mcg|IU|ml|ug))?)',
                     r'(?:mg|g|mcg|IU|dose)[^.]+',
                     r'(?:vs\.?|versus|compared\s+to|frente\s+a)[^.]+',
                 ]
