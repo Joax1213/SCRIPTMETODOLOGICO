@@ -354,6 +354,8 @@ def parse_quality_and_bias(input_file, theme="general"):
             ctrl_patterns = ["sí", "alta", "fuerte", "moderada", "moderate", "high", "yes"]
 
             total_papers = len(df)
+            if total_papers == 0:
+                return "No hay artículos en la muestra para analizar.", {}
             sd_mask   = _is_positive(df[c_sd].astype(str),   sd_patterns)
             lod_mask  = _is_positive(df[c_lod].astype(str),  lod_patterns)
             ctrl_mask = _is_positive(df[c_ctrl].astype(str), ctrl_patterns)
